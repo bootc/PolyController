@@ -1,0 +1,19 @@
+
+* FLASH memory driver
+* PolyFS on FLASH glue
+* CFS (coffee fs) glue
+
+* DS1307 driver (RTC)
+* DS2482-100 driver (1-wire)
+
+* OWFS client (to pull values from owfs)
+* PID controller
+* Scheduling/calendar tool
+* Web interface
+* IPv6 version
+
+* 1-wire bridge / interface
+
+Maybes?
+? xAP node thingy
+

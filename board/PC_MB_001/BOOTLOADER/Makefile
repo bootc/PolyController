@@ -1,0 +1,28 @@
+
+# Set .text section address for bootloader
+LDFLAGS += -Wl,--section-start=.text=$(CONFIG_BOOTLDR_START_ADDR)
+
+# Fuse values
+EFUSE =  0xFF	# default FF (no BOD)
+HFUSE =  0x98	# default 99 (bootrst)
+LFUSE =  0xE7	# default 62 (no clock div, crystal osc)
+UNLOCK = 0x3F	# everything unlocked
+LOCK =   0x0F	# BLB12 and BLB11 programmed
+
+# Special programming rule for the bootloader
+program_bl: $(TARGET).hex $(TARGET).eep
+	# Unlock device & program fuses
+	$(AVRDUDE) $(AVRDUDE_FLAGS) -e -u \
+		-U lock:w:$(strip $(UNLOCK)):m -U efuse:w:$(strip $(EFUSE)):m \
+		-U hfuse:w:$(strip $(HFUSE)):m -U lfuse:w:$(strip $(LFUSE)):m
+	# Program flash and lock bootloader section
+	$(AVRDUDE) $(AVRDUDE_FLAGS) \
+		$(AVRDUDE_WRITE_FLASH) $(AVRDUDE_WRITE_EEPROM) \
+		-U lock:w:$(strip $(LOCK)):m
+
+$(curdir)-y += main.c
+
+.PHONY: program_bl
+
+$(eval $(call subdir,$(curdir)))
+

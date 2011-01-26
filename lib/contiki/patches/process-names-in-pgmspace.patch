@@ -1,0 +1,37 @@
+Index: core/sys/process.h
+===================================================================
+RCS file: /cvsroot/contiki/contiki-2.x/core/sys/process.h,v
+retrieving revision 1.17
+diff -d -u -p -r1.17 process.h
+--- core/sys/process.h	14 Sep 2010 18:55:04 -0000	1.17
++++ core/sys/process.h	26 Jan 2011 10:06:58 -0000
+@@ -56,6 +56,7 @@
+ 
+ #include "sys/pt.h"
+ #include "sys/cc.h"
++#include <avr/pgmspace.h>
+ 
+ typedef unsigned char process_event_t;
+ typedef void *        process_data_t;
+@@ -307,7 +308,8 @@ static PT_THREAD(process_thread_##name(s
+ #else
+ #define PROCESS(name, strname)				\
+   PROCESS_THREAD(name, ev, data);			\
+-  struct process name = { NULL, strname,		\
++  static const char name##_strname[] PROGMEM = strname; \
++  struct process name = { NULL, name##_strname,		\
+                           process_thread_##name }
+ #endif
+ 
+@@ -316,9 +318,9 @@ static PT_THREAD(process_thread_##name(s
+ struct process {
+   struct process *next;
+ #if PROCESS_CONF_NO_PROCESS_NAMES
+-#define PROCESS_NAME_STRING(process) ""
++#define PROCESS_NAME_STRING(process) PSTR("")
+ #else
+-  const char *name;
++  PGM_P name;
+ #define PROCESS_NAME_STRING(process) (process)->name
+ #endif
+   PT_THREAD((* thread)(struct pt *, process_event_t, process_data_t));
