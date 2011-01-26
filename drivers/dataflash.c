@@ -51,10 +51,12 @@
 // size of dataflash in bytes
 #define FLASH_SIZE 1048576
 
-#define SECTOR_32K_SIZE ((uint32_t)(1 << 15))
-#define SECTOR_32K_MASK ((uint32_t)~(SECTOR_32K_SIZE - 1))
-#define SECTOR_64K_SIZE ((uint32_t)(1 << 16))
-#define SECTOR_64K_MASK ((uint32_t)~(SECTOR_64K_SIZE - 1))
+#define WR_PAGE_SIZE ((uint32_t)1 << 8)
+#define WR_PAGE_MASK (~(WR_PAGE_SIZE - 1))
+#define SECTOR_32K_SIZE ((uint32_t)1 << 15)
+#define SECTOR_32K_MASK (~(SECTOR_32K_SIZE - 1))
+#define SECTOR_64K_SIZE ((uint32_t)1 << 16)
+#define SECTOR_64K_MASK (~(SECTOR_64K_SIZE - 1))
 
 static const dataflash_sector_t sectors[] PROGMEM = {
 	{ 0x00000, 0x0ffff }, //  0: 64K
@@ -538,7 +540,7 @@ int dataflash_erase_32k(uint32_t addr) {
 	dataflash_sector_from_addr(start, &sector);
 
 	// Go through all the sectors in this erase block
-	while (sector.end <= end) {
+	do {
 		// Read sector protection information
 		err = dataflash_read_protection(sector.start, &temp);
 		if (err) {
@@ -555,7 +557,7 @@ int dataflash_erase_32k(uint32_t addr) {
 		if (dataflash_sector_from_addr(sector.end + 1, &sector)) {
 			break;
 		}
-	}
+	} while (sector.end < end);
 
 	// Get the current device status
 	err = dataflash_read_status(&temp);
@@ -586,6 +588,9 @@ int dataflash_erase_32k(uint32_t addr) {
 int dataflash_erase_64k(uint32_t addr) {
 	int err;
 	uint8_t temp;
+	uint32_t start = addr & SECTOR_64K_MASK;
+	uint32_t end = start + SECTOR_64K_SIZE;
+	dataflash_sector_t sector;
 
 	// Make sure init has been called
 	if (!status.inited) {
@@ -597,17 +602,28 @@ int dataflash_erase_64k(uint32_t addr) {
 		return -1;
 	}
 
-	// Read sector protection information
-	err = dataflash_read_protection(addr, &temp);
-	if (err) {
-		return err;
-	}
+	// Find the sector information for the address
+	dataflash_sector_from_addr(start, &sector);
 
-	// Check that the sector isn't protected
-	if (temp != 0x00) {
-		dataflash_write_disable();
-		return -1;
-	}
+	// Go through all the sectors in this erase block
+	do {
+		// Read sector protection information
+		err = dataflash_read_protection(sector.start, &temp);
+		if (err) {
+			return err;
+		}
+
+		// Check that the sector isn't protected
+		if (temp != 0x00) {
+			dataflash_write_disable();
+			return -1;
+		}
+
+		// Get the next sector info
+		if (dataflash_sector_from_addr(sector.end + 1, &sector)) {
+			break;
+		}
+	} while (sector.end < end);
 
 	// Get the current device status
 	err = dataflash_read_status(&temp);
@@ -627,7 +643,7 @@ int dataflash_erase_64k(uint32_t addr) {
 	spi_rw(CMD_ERASE_BLK_64K);
 
 	// Send address
-	send_address(addr);
+	send_address(start);
 
 	// All done
 	dev_release();
@@ -635,7 +651,112 @@ int dataflash_erase_64k(uint32_t addr) {
 	return 0;
 }
 
-int dataflash_erase_chip(void);
+int dataflash_erase_chip(void) {
+	int err;
+	uint8_t sreg;
 
-int dataflash_write_data(void *buf, uint32_t addr, uint8_t bytes);
+	// Make sure init has been called
+	if (!status.inited) {
+		return -1;
+	}
+
+	// Get the current device status
+	err = dataflash_read_status(&sreg);
+	if (err) {
+		return err;
+	}
+
+	// Check that WEL is set
+	if (!(sreg & DATAFLASH_SREG_WEL)) {
+		return -1;
+	}
+
+	// Check that none of the sectors are protected
+	if (sreg & DATAFLASH_SREG_SWP0) {
+		dataflash_write_disable();
+		return -1;
+	}
+
+	// Start talking
+	dev_assert();
+
+	// Send command
+	spi_rw(CMD_ERASE_CHIP);
+
+	// All done
+	dev_release();
+
+	return 0;
+}
+
+int dataflash_write_data(void *buf, uint32_t addr, uint8_t bytes) {
+	uint8_t *cbuf = (uint8_t *)buf;
+	uint32_t page_start = addr & WR_PAGE_MASK;
+	uint32_t page_end = page_start + WR_PAGE_SIZE;
+	int err;
+	uint8_t temp;
+
+	// Make sure init has been called
+	if (!status.inited) {
+		return -1;
+	}
+
+	// Sanity-check the inputs
+	if (addr >= FLASH_SIZE) {
+		return -1;
+	}
+	else if (bytes == 0) {
+		return 0;
+	}
+	else if (addr + bytes >= FLASH_SIZE) {
+		bytes = FLASH_SIZE - bytes;
+	}
+
+	// Clamp write size to the end of the write page
+	if (addr + bytes > page_end) {
+		bytes = page_end - addr;
+	}
+
+	// Read protection status
+	err = dataflash_read_protection(addr, &temp);
+	if (err) {
+		return err;
+	}
+
+	// Check protection status
+	if (temp != 0x00) {
+		dataflash_write_disable();
+		return -1;
+	}
+
+	// Read status register
+	err = dataflash_read_status(&temp);
+	if (err) {
+		return -1;
+	}
+
+	// Check for WEL
+	if (!(temp & DATAFLASH_SREG_WEL)) {
+		return -1;
+	}
+
+	// Start talking
+	dev_assert();
+
+	// Send command
+	spi_rw(CMD_WR_PAGE);
+
+	// Send address
+	send_address(addr);
+
+	// Write data
+	for (uint16_t i = 0; i < bytes; i++) {
+		spi_rw(*(cbuf++));
+	}
+
+	// All done
+	dev_release();
+
+	return bytes;
+}
 
