@@ -85,8 +85,10 @@ ISR(TIMER0_COMPA_vect) {
 
 void clock_init(void) {
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-		// CTC mode, prescaler = 256
+		// CTC mode
 		TCCR0A = _BV(WGM01);
+
+		// Set prescaler
 #if PRESCALER == 256
 		TCCR0B = _BV(CS02);
 #else
