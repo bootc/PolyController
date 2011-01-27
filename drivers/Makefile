@@ -6,6 +6,7 @@ $(curdir)-$(CONFIG_DRIVERS_ENC424J600) += enc424j600.c
 $(curdir)-$(CONFIG_DRIVERS_I2C) += i2c.c
 $(curdir)-$(CONFIG_DRIVERS_SPI) += spi.c
 $(curdir)-$(CONFIG_DRIVERS_UART) += uart.c
+$(curdir)-$(CONFIG_DRIVERS_WALLCLOCK) += wallclock.c
 
 $(eval $(call subdir,$(curdir)))
 

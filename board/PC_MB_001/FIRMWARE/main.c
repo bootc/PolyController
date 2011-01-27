@@ -32,6 +32,7 @@
 #include "apps/serial-shell.h"
 #include "apps/shell/shell-ps.h"
 #include "apps/shell/shell-netstat.h"
+#include "drivers/wallclock.h"
 
 PROCINIT(
 	&etimer_process,
@@ -45,6 +46,7 @@ PROCINIT(
 int main(void) {
 	board_init();
 	clock_init();
+	wallclock_init();
 
 	sei();
 
