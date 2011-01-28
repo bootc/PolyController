@@ -1,0 +1,35 @@
+
+= Chip Resource Use =
+
+== Timer/Counter 0 ==
+File: board/PC_MB_001/clock.c
+
+Used for the primary system clock, generating a software interrupt at 375 Hz.
+This is based on the system clock crystal which should tick at 12 MHz, but may
+not be completely accurate.
+
+
+== Timer/Counter 2 ==
+File: drivers/wallclock.c
+
+Used to keep accurate wall-clock time using the 32.768 KHz clock output from the
+DS1307 RTC.
+
+
+== SPI ==
+File: drivers/spi.c
+
+SPI driver. All SPI operations should use this driver.
+
+
+== USART 0 and 1 ==
+File: drivers/uart.c
+
+UART driver. All UART operations should use this driver.
+
+
+== TWI / I2C ==
+File: drivers/i2c.c
+
+I2C driver. All I2C operations should use this driver.
+
