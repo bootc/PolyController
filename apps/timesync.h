@@ -21,17 +21,20 @@
 #ifndef __TIMESYNC_H__
 #define __TIMESYNC_H__
 
+#include "drivers/wallclock.h"
+
 // How often to refresh the local time offset (in seconds)
 #define SNTP_RESYNC_INTERVAL	600
 
 typedef struct {
 	int					running : 1;
 	int					synchronised : 1;
-	int					time_valid : 1;
 } timesync_status_t;
 
 extern timesync_status_t timesync_status;
 extern process_event_t timesync_event;
+
+int timesync_set_time(const wallclock_time_t *time);
 
 PROCESS_NAME(timesync_process);
 

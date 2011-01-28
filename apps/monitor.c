@@ -123,17 +123,15 @@ PROCESS_THREAD(monitor_process, ev, data) {
 		}
 #endif
 		else if (ev == timesync_event) {
-			log_message_P(PSTR("\rTimeSync: %Srunning, %Sin sync, time %Svalid"),
+			log_message_P(PSTR("\rTimeSync: %Srunning, %Sin sync"),
 				timesync_status.running ? PSTR("") : PSTR("not "),
-				timesync_status.synchronised ? PSTR("") : PSTR("not "),
-				timesync_status.time_valid ? PSTR("") : PSTR("not "));
+				timesync_status.synchronised ? PSTR("") : PSTR("not "));
 
-			if (timesync_status.time_valid) {
-				wallclock_time_t time = wallclock_get();
-				uint32_t ms = ((uint32_t)time.frac * 1000) >> 12;
-				log_message_P(PSTR("Wallclock: Time is %lu.%04lus"),
-					time.sec, ms);
-			}
+			wallclock_time_t time;
+			wallclock_get(&time);
+			uint32_t ms = ((uint32_t)time.frac * 1000) >> 12;
+			log_message_P(PSTR("Wallclock: Time is %lu.%04lus"),
+				time.sec, ms);
 		}
 		else if (ev == PROCESS_EVENT_TIMER) {
 			if (data == &heartbeat &&
