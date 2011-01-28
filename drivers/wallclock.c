@@ -108,14 +108,28 @@ void wallclock_set(wallclock_time_t time) {
 	}
 }
 
-void wallclock_get(wallclock_time_t *time) {
+wallclock_time_t wallclock_get() {
+	wallclock_time_t time;
+
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		// Get the time from the status struct
-		time->sec = status.sec;
-		time->frac = status.frac << 8;
+		time.sec = status.sec;
+		time.frac = status.frac << 8;
 
 		// Fill-in the fractional part
-		time->frac |= TCNT2;
+		time.frac |= TCNT2;
 	}
+
+	return time;
+}
+
+uint32_t wallclock_seconds() {
+	uint32_t sec;
+
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+		sec = status.sec;
+	}
+
+	return sec;
 }
 

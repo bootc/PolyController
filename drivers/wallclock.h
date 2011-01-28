@@ -36,6 +36,7 @@ typedef struct {
 
 void wallclock_init(void);
 void wallclock_set(wallclock_time_t time);
-void wallclock_get(wallclock_time_t *time);
+wallclock_time_t wallclock_get(void);
+uint32_t wallclock_seconds(void); // shortcut for just seconds
 
 #endif /* WALLCLOCK_H */
