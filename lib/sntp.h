@@ -80,8 +80,9 @@ struct sntp_hdr
 
 void sntp_sync(uip_ipaddr_t ipaddr);
 void sntp_appcall(process_event_t ev, void *data);
-void sntp_synced(const struct sntp_hdr *message);
 
+// Implemented by library clients
+extern void sntp_synced(const struct sntp_hdr *message);
 extern uint32_t sntp_seconds(void);
 
 #endif
