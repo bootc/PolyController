@@ -27,26 +27,24 @@
 #include "board.h"
 #include "apps/network.h"
 #include "apps/dhcp.h"
-#include "apps/sntpclient.h"
 #include "apps/monitor.h"
 #include "apps/serial-shell.h"
 #include "apps/shell/shell-ps.h"
 #include "apps/shell/shell-netstat.h"
-#include "drivers/wallclock.h"
+#include "apps/timesync.h"
 
 PROCINIT(
 	&etimer_process,
 	&tcpip_process,
 	&network_process,
 	&dhcp_process,
-	&sntp_process,
+	&timesync_process,
 	&serial_line_process,
 	&monitor_process);
 
 int main(void) {
 	board_init();
 	clock_init();
-	wallclock_init();
 
 	sei();
 

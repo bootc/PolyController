@@ -18,25 +18,21 @@
  * MA 02110-1301, USA.
  */
 
-#ifndef __SNTPCLIENT_H__
-#define __SNTPCLIENT_H__
+#ifndef __TIMESYNC_H__
+#define __TIMESYNC_H__
 
 // How often to refresh the local time offset (in seconds)
 #define SNTP_RESYNC_INTERVAL	600
 
 typedef struct {
-	int			running : 1;
-	int			synchronised : 1;
-	int			offset_valid : 1;
-	uint32_t	offset_seconds;
-} sntp_status_t;
+	int					running : 1;
+	int					synchronised : 1;
+	int					time_valid : 1;
+} timesync_status_t;
 
-extern sntp_status_t sntp_status;
-extern process_event_t sntp_event;
+extern timesync_status_t timesync_status;
+extern process_event_t timesync_event;
 
-// seconds since NTP epoch
-uint32_t sntp_seconds(void);
-
-PROCESS_NAME(sntp_process);
+PROCESS_NAME(timesync_process);
 
 #endif

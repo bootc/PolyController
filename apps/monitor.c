@@ -25,9 +25,11 @@
 #if CONFIG_APPS_DHCP
 #include "dhcp.h"
 #endif
-#include "sntpclient.h"
-#include "lib/stack.h"
 #include "shell/shell.h"
+#include "timesync.h"
+
+#include "drivers/wallclock.h"
+#include "lib/stack.h"
 #include "lib/polyfs.h"
 
 #include <stdio.h>
@@ -120,15 +122,17 @@ PROCESS_THREAD(monitor_process, ev, data) {
 			}
 		}
 #endif
-		else if (ev == sntp_event) {
-			log_message_P(PSTR("\rSNTP: %Srunning, %Sin sync, offset %Svalid"),
-				sntp_status.running ? PSTR("") : PSTR("not "),
-				sntp_status.synchronised ? PSTR("") : PSTR("not "),
-				sntp_status.offset_valid ? PSTR("") : PSTR("not "));
+		else if (ev == timesync_event) {
+			log_message_P(PSTR("\rTimeSync: %Srunning, %Sin sync, time %Svalid"),
+				timesync_status.running ? PSTR("") : PSTR("not "),
+				timesync_status.synchronised ? PSTR("") : PSTR("not "),
+				timesync_status.time_valid ? PSTR("") : PSTR("not "));
 
-			if (sntp_status.offset_valid) {
-				log_message_P(PSTR("SNTP: Offset is %lus"),
-					sntp_status.offset_seconds);
+			if (timesync_status.time_valid) {
+				wallclock_time_t time = wallclock_get();
+				uint32_t ms = ((uint32_t)time.frac * 1000) >> 12;
+				log_message_P(PSTR("Wallclock: Time is %lu.%04lus"),
+					time.sec, ms);
 			}
 		}
 		else if (ev == PROCESS_EVENT_TIMER) {
