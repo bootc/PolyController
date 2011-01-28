@@ -6,6 +6,7 @@ $(curdir)-$(CONFIG_LIB_LZO) += minilzo/minilzo.c
 $(curdir)-$(CONFIG_LIB_POLYFS) += polyfs.c
 $(curdir)-$(CONFIG_LIB_POLYFS_CFS) += polyfs_cfs.c
 $(curdir)-$(CONFIG_LIB_POLYFS_DF) += polyfs_df.c
+$(curdir)-$(CONFIG_LIB_RTC) += rtc.c
 $(curdir)-$(CONFIG_LIB_SNTP) += sntp.c
 $(curdir)-$(CONFIG_LIB_STACK) += stack.c
 
