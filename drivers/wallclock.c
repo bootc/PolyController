@@ -94,33 +94,29 @@ void wallclock_init(void) {
 	}
 }
 
-void wallclock_set(wallclock_time_t time) {
+void wallclock_set(const wallclock_time_t *time) {
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		// Update the status structs
-		status.sec = time.sec;
-		status.frac = time.frac >> 8;
+		status.sec = time->sec;
+		status.frac = time->frac >> 8;
 
 		// Update the timer register
-		TCNT2 = time.frac & 0xff;
+		TCNT2 = time->frac & 0xff;
 
 		// Reset the prescaler (is this really necessary?)
 		GTCCR = _BV(PSRASY);
 	}
 }
 
-wallclock_time_t wallclock_get() {
-	wallclock_time_t time;
-
+void wallclock_get(wallclock_time_t *time) {
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		// Get the time from the status struct
-		time.sec = status.sec;
-		time.frac = status.frac << 8;
+		time->sec = status.sec;
+		time->frac = status.frac << 8;
 
 		// Fill-in the fractional part
-		time.frac |= TCNT2;
+		time->frac |= TCNT2;
 	}
-
-	return time;
 }
 
 uint32_t wallclock_seconds() {
