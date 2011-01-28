@@ -38,6 +38,30 @@
 #define HOUR_12		_BV(6)
 #define HOUR_PM		_BV(5)
 
+struct ds1307_raw {
+	/* 0x00: Seconds */
+	uint8_t ch : 1;
+	uint8_t sec : 7;
+
+	/* 0x01: Minutes */
+	uint8_t min;
+
+	/* 0x02: Hours */
+	uint8_t hour;
+
+	/* 0x03: Day of Week */
+	uint8_t wday;
+
+	/* 0x04: Day of Month */
+	uint8_t mday;
+
+	/* 0x05: Month */
+	uint8_t mon;
+
+	/* 0x06: Year */
+	uint8_t year;
+};
+
 static int read(uint8_t *ptr, uint8_t offset, uint8_t len) {
 	int ret;
 
@@ -168,112 +192,80 @@ int ds1307_clock_stop(void) {
 	return 0;
 }
 
-int ds1307_time_set(ds1307_time_t time) {
+int ds1307_clock_set(const struct rtc_time *tm) {
 	int ret;
-	uint8_t raw[3];
+	struct ds1307_raw raw;
 
-	// Sanity check values
-	if ((time.hour > 23) ||
-		(time.min > 59) ||
-		(time.sec > 59))
-	{
+	// Sanity check
+	ret = rtc_valid_tm(tm);
+	if (ret) {
+		return -1;
+	}
+
+	// We also check the year >= 2000
+	if (tm->year < 2000) {
 		return -1;
 	}
 
 	// Read the current seconds value
-	ret = read(&raw[0], ADDR_SEC, sizeof(raw[0]));
+	ret = read((uint8_t *)&raw, ADDR_SEC, 1); // just the first byte is enough
 	if (ret) {
 		return ret;
 	}
 
 	// Update the values, keeping the CH bit intact
-	raw[0] = dec2bcd(time.sec) | (raw[0] & SEC_CH);
-	raw[1] = dec2bcd(time.min);
-	raw[2] = dec2bcd(time.hour);
+	raw.sec = dec2bcd(tm->sec);
+	raw.min = dec2bcd(tm->min);
+	raw.hour = dec2bcd(tm->hour);
+	raw.wday = dec2bcd(tm->wday + 1);
+	raw.mday = dec2bcd(tm->mday);
+	raw.mon = dec2bcd(tm->mon + 1);
+	raw.year = dec2bcd(tm->year - 2000);
 
 	// Write the values back
-	ret = write(raw, ADDR_SEC, sizeof(raw));
+	ret = write((uint8_t *)&raw, ADDR_SEC, sizeof(raw));
 	if (ret) {
 		return ret;
 	}
 
-	return 0;
+	return 0;	
 }
 
-int ds1307_time_get(ds1307_time_t *time) {
+int ds1307_clock_get(struct rtc_time *tm) {
 	int ret;
+	struct ds1307_raw raw;
 
 	// Read the values from the RTC
-	ret = read((uint8_t *)time, ADDR_SEC, sizeof(*time));
+	ret = read((uint8_t *)&raw, ADDR_SEC, sizeof(raw));
 	if (ret) {
 		return ret;
 	}
 
-	// Convert the values, ignoring the CH bit
-	time->sec = bcd2dec(time->sec & ~SEC_CH);
-	time->min = bcd2dec(time->min);
+	// Convert the values
+	tm->sec = bcd2dec(raw.sec);
+	tm->min = bcd2dec(raw.min);
+	// hour is done below
+	tm->mday = bcd2dec(raw.mday);
+	tm->mon = bcd2dec(raw.mon - 1);
+	tm->year = bcd2dec(raw.year + 2000);
+	tm->wday = bcd2dec(raw.wday - 1);
 
 	// Convert hours, taking into account 12-hour mode
-	if (time->hour & HOUR_12) {
-		if (time->hour & HOUR_PM) {
+	if (raw.hour & HOUR_12) {
+		if (raw.hour & HOUR_PM) {
 			// 1 - 12 pm is 13 - 00
-			time->hour = bcd2dec(time->hour & ~(HOUR_12 | HOUR_PM));
-			time->hour += 12;
-			time->hour %= 24;
+			tm->hour = bcd2dec(raw.hour & ~(HOUR_12 | HOUR_PM));
+			tm->hour += 12;
+			tm->hour %= 24;
 		}
 		else {
 			// 1 - 12 am is 01 - 12
-			time->hour = bcd2dec(time->hour & ~HOUR_12);
+			tm->hour = bcd2dec(raw.hour & ~HOUR_12);
 		}
 	}
 	else {
-		time->hour = bcd2dec(time->hour);
+		tm->hour = bcd2dec(raw.hour);
 	}
-
-	return 0;
-}
-
-int ds1307_date_set(ds1307_date_t date) {
-	int ret;
-
-	// Sanity check values
-	if ((date.year > 99) ||
-		(date.month < 1) || (date.month > 12) ||
-		(date.day < 1) || (date.day > 31) ||
-		(date.dow < 1) || (date.dow > 7))
-	{
-		return -1;
-	}
-
-	// Convert to BCD
-	date.year = dec2bcd(date.year);
-	date.month = dec2bcd(date.year);
-	date.day = dec2bcd(date.day);
-	date.dow = dec2bcd(date.dow);
-
-	// Write the values
-	ret = write((uint8_t *)&date, ADDR_DAY, sizeof(date));
-	if (ret) {
-		return -1;
-	}
-
-	return 0;
-}
-
-int ds1307_date_get(ds1307_date_t *date) {
-	int ret;
-
-	// Read the values
-	ret = read((uint8_t *)date, ADDR_DAY, sizeof(*date));
-	if (ret) {
-		return -1;
-	}
-
-	// Convert from BCD
-	date->year = bcd2dec(date->year);
-	date->month = bcd2dec(date->month);
-	date->day = bcd2dec(date->day);
-	date->dow = bcd2dec(date->dow);
 
 	return 0;
 }

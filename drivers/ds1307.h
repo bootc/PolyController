@@ -21,25 +21,14 @@
 #ifndef DS1307_H
 #define DS1307_H
 
+#include <rtc.h>
+
 /**
  * Driver for DS1307 RTC chip.
  *
  * This driver always uses 24-hour time and encodes/decodes the BCD values used
  * by the chip as necessary - no BCD conversions are required in user code.
  */
-
-typedef struct {
-	uint8_t sec;	// 0 to 59
-	uint8_t min;	// 0 to 59
-	uint8_t hour;	// 0 to 23
-} ds1307_time_t;
-
-typedef struct {
-	uint8_t dow;	// 1 to 7
-	uint8_t day;	// 1 to 31
-	uint8_t month;	// 1 to 12
-	uint8_t year;	// 0 to 99
-} ds1307_date_t;
 
 #define DS1307_ADDR		0xD0
 #define DS1307_RAMSTART	0x08
@@ -61,11 +50,8 @@ typedef struct {
 int ds1307_clock_start(void);
 int ds1307_clock_stop(void);
 
-int ds1307_time_set(ds1307_time_t time);
-int ds1307_time_get(ds1307_time_t *time);
-
-int ds1307_date_set(ds1307_date_t date);
-int ds1307_date_get(ds1307_date_t *date);
+int ds1307_clock_set(const struct rtc_time *tm);
+int ds1307_clock_get(struct rtc_time *tm);
 
 int ds1307_ctl_set(uint8_t ctl);
 int ds1307_ctl_get(uint8_t *ctl);
