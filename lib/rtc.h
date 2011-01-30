@@ -29,14 +29,16 @@
 #define NTP_TO_UNIX(time) ((time) - NTP_TO_UNIX_OFFSET)
 #define UNIX_TO_NTP(time) ((time) + NTP_TO_UNIX_OFFSET)
 
+typedef int32_t time_t;
+
 struct rtc_time {
-	uint8_t		sec;	// 00-59
-	uint8_t		min;	// 00-59
-	uint8_t		hour;	// 00-23
-	uint8_t		mday;	// 01-<days in month>
-	uint8_t		mon;	// 00-11
-	uint16_t	year;	// 1970-
-	uint8_t		wday;	// 0-6, 0=Sunday
+	uint8_t	sec;	// 00-59
+	uint8_t	min;	// 00-59
+	uint8_t	hour;	// 00-23
+	uint8_t	mday;	// 01-<days in month>
+	uint8_t	mon;	// 00-11
+	uint8_t	year;	// (year - 1900)
+	uint8_t	wday;	// 0-6, 0=Sunday
 };
 
 
@@ -45,7 +47,7 @@ struct rtc_time {
  * Assumes input in normal date format, i.e. 1980-12-31 23:59:59
  * => year=1980, mon=12, day=31, hour=23, min=59, sec=59. 
  */
-uint32_t mktime(
+time_t mktime(
 	const uint16_t year, const uint8_t mon,
 	const uint8_t day, const uint8_t hour,
 	const uint8_t min, const uint8_t sec);
@@ -53,12 +55,12 @@ uint32_t mktime(
 /*
  * Convert seconds since 01-01-1970 00:00:00 to Gregorian date.
  */
-void rtc_time_to_tm(uint32_t time, struct rtc_time *tm);
+void rtc_time_to_tm(time_t time, struct rtc_time *tm);
 
 /*
  * Convert Gregorian date to seconds since 01-01-1970 00:00:00.
  */
-uint32_t rtc_tm_to_time(const struct rtc_time *tm);
+time_t rtc_tm_to_time(const struct rtc_time *tm);
 
 /*
  * Does the rtc_time represent a valid date/time?

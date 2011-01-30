@@ -50,7 +50,7 @@
 int ds1307_clock_start(void);
 int ds1307_clock_stop(void);
 
-int ds1307_clock_set(const struct rtc_time *tm);
+int ds1307_clock_set(const struct rtc_time * const tm);
 int ds1307_clock_get(struct rtc_time *tm);
 
 int ds1307_ctl_set(uint8_t ctl);

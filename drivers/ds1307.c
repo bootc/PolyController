@@ -192,7 +192,7 @@ int ds1307_clock_stop(void) {
 	return 0;
 }
 
-int ds1307_clock_set(const struct rtc_time *tm) {
+int ds1307_clock_set(const struct rtc_time * const tm) {
 	int ret;
 	struct ds1307_raw raw;
 
@@ -202,8 +202,8 @@ int ds1307_clock_set(const struct rtc_time *tm) {
 		return -1;
 	}
 
-	// We also check the year >= 2000
-	if (tm->year < 2000) {
+	// We also check the year 2000 <= x < 2100
+	if (tm->year < 100 || tm->year >= 200) {
 		return -1;
 	}
 
@@ -220,7 +220,7 @@ int ds1307_clock_set(const struct rtc_time *tm) {
 	raw.wday = dec2bcd(tm->wday + 1);
 	raw.mday = dec2bcd(tm->mday);
 	raw.mon = dec2bcd(tm->mon + 1);
-	raw.year = dec2bcd(tm->year - 2000);
+	raw.year = dec2bcd(tm->year % 100);
 
 	// Write the values back
 	ret = write((uint8_t *)&raw, ADDR_SEC, sizeof(raw));
@@ -247,7 +247,7 @@ int ds1307_clock_get(struct rtc_time *tm) {
 	// hour is done below
 	tm->mday = bcd2dec(raw.mday);
 	tm->mon = bcd2dec(raw.mon - 1);
-	tm->year = bcd2dec(raw.year + 2000);
+	tm->year = bcd2dec(raw.year + 100); // we assume a century of 2000
 	tm->wday = bcd2dec(raw.wday - 1);
 
 	// Convert hours, taking into account 12-hour mode

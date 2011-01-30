@@ -60,7 +60,7 @@ static inline uint8_t rtc_month_days(uint8_t month, uint16_t year) {
  * machines where long is 32-bit! (However, as time_t is signed, we
  * will already get problems at other places on 2038-01-19 03:14:08)
  */
-uint32_t mktime(
+time_t mktime(
 	const uint16_t year0, const uint8_t mon0,
 	const uint8_t day, const uint8_t hour,
 	const uint8_t min, const uint8_t sec)
@@ -85,7 +85,7 @@ uint32_t mktime(
 /*
  * Convert seconds since 01-01-1970 00:00:00 to Gregorian date.
  */
-void rtc_time_to_tm(uint32_t time, struct rtc_time *tm) {
+void rtc_time_to_tm(time_t time, struct rtc_time *tm) {
 	uint16_t year;
 	uint8_t month;
 	int32_t days;
@@ -104,7 +104,7 @@ void rtc_time_to_tm(uint32_t time, struct rtc_time *tm) {
 		year -= 1;
 		days += 365 + is_leap_year(year);
 	}
-	tm->year = year;
+	tm->year = year - 1900;
 
 	for (month = 0; month < 11; month++) {
 		int32_t newdays = days - rtc_month_days(month, year);
@@ -124,8 +124,8 @@ void rtc_time_to_tm(uint32_t time, struct rtc_time *tm) {
 /*
  * Convert Gregorian date to seconds since 01-01-1970 00:00:00.
  */
-uint32_t rtc_tm_to_time(const struct rtc_time *tm) {
-	return mktime(tm->year, tm->mon + 1, tm->mday,
+time_t rtc_tm_to_time(const struct rtc_time *tm) {
+	return mktime(tm->year + 1900, tm->mon + 1, tm->mday,
 		tm->hour, tm->min, tm->sec);
 }
 
@@ -133,8 +133,7 @@ uint32_t rtc_tm_to_time(const struct rtc_time *tm) {
  * Does the rtc_time represent a valid date/time?
  */
 int rtc_valid_tm(const struct rtc_time *tm) {
-	if (tm->year < 1970
-		|| tm->mon >= 12
+	if (tm->mon >= 12
 		|| tm->mday < 1
 		|| tm->mday > rtc_month_days(tm->mon, tm->year)
 		|| tm->hour >= 24

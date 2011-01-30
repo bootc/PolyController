@@ -94,7 +94,7 @@ void wallclock_init(void) {
 	}
 }
 
-void wallclock_set(const wallclock_time_t *time) {
+void wallclock_set(const wallclock_time_t * const time) {
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		// Update the status structs
 		status.sec = time->sec;
