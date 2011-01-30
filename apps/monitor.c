@@ -101,7 +101,7 @@ PROCESS_THREAD(monitor_process, ev, data) {
 				dhcp_status.configured ? PSTR("") : PSTR("not "));
 
 			if (dhcp_status.configured) {
-				PORTD |= _BV(PD7);
+				PORTD |= _BV(PIND7);
 
 				const struct dhcpc_state *s = dhcp_status.state;
 
@@ -118,7 +118,7 @@ PROCESS_THREAD(monitor_process, ev, data) {
 					uip_ntohs(s->lease_time[1]));
 			}
 			else {
-				PORTD &= ~_BV(PD7);
+				PORTD &= ~_BV(PIND7);
 			}
 		}
 #endif
@@ -140,7 +140,7 @@ PROCESS_THREAD(monitor_process, ev, data) {
 				etimer_restart(&heartbeat);
 
 				// Toggle heartbeat LED
-				PORTD ^= _BV(PD6);
+				PORTD ^= _BV(PIND6);
 			}
 		}
 		else if (ev == PROCESS_EVENT_EXIT) {
