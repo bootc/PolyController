@@ -33,51 +33,104 @@ typedef struct {
 
 static ds2482_status_t s;
 
-#define POLL_LIMIT 200
+#define POLL_LIMIT	200
 
-#define CMD_DRST 0xf0
-#define CMD_WCFG 0xd2
-#define CMD_CHSL 0xc3
-#define CMD_SRP  0xe1
-#define CMD_1WRS 0xb4
-#define CMD_1WWB 0xa5
-#define CMD_1WRB 0x96
-#define CMD_1WSB 0x87
-#define CMD_1WT  0x78
+#define CMD_DRST	0xf0
+#define CMD_WCFG	0xd2
+#define CMD_CHSL	0xc3
+#define CMD_SRP		0xe1
+#define CMD_1WRS	0xb4
+#define CMD_1WWB	0xa5
+#define CMD_1WRB	0x96
+#define CMD_1WSB	0x87
+#define CMD_1WT		0x78
 
-#define STATUS_DIR 0x80
-#define STATUS_TSB 0x40
-#define STATUS_SBR 0x20
-#define STATUS_RST 0x10
-#define STATUS_LL  0x08
-#define STATUS_SD  0x04
-#define STATUS_PPD 0x02
-#define STATUS_1WB 0x01
+#define STATUS_DIR	0x80
+#define STATUS_TSB	0x40
+#define STATUS_SBR	0x20
+#define STATUS_RST	0x10
+#define STATUS_LL	0x08
+#define STATUS_SD	0x04
+#define STATUS_PPD	0x02
+#define STATUS_1WB	0x01
 
-#define CONFIG_1WS 0x08
-#define CONFIG_SPU 0x04
-#define CONFIG_APU 0x01
-
-#define MODE_STANDARD  0x00
-#define MODE_OVERDRIVE 0x01
-#define MODE_STRONG    0x02
-
-static int ds2482_write_config(void);
-static int ow_search(ow_search_t *s);
-static uint8_t ds2482_search_triplet(int search_direction);
+#define CONFIG_1WS	0x08
+#define CONFIG_SPU	0x04
+#define CONFIG_APU	0x01
 
 /*
- * DS2428 Detect routine that sets the I2C address and then performs a
- * device reset followed by writing the configuration byte to default values:
- *   1-Wire speed (c1WS) = standard (0)
- *   Strong pullup (cSPU) = off (0)
- *   Presence pulse masking (cPPM) = off (0)
- *   Active pullup (cAPU) = on (CONFIG_APU = 0x01)
+ * Perform a device reset on the DS2482.
  *
  * Return:
- *  0 if device was detected and written
- *  -1 on failure
+ *   0 - device was reset
+ *  -1 - failure
  */
+static int ds2482_reset(void);
+
+/*
+ * Write the configuration register in the DS2482. The configuration
+ * options are provided in the lower nibble of the provided config byte.
+ * The uppper nibble in bitwise inverted when written to the DS2482.
+ *
+ * Return:
+ *   0 - config written and verified
+ *  -1 - failure
+ */
+static int ds2482_write_config(void);
+
+/*
+ * Use the DS2482 help command '1-Wire triplet' to perform one bit of a
+ * 1-Wire search.
+ *
+ * This command does two read bits and one write bit. The write bit
+ * is either the default direction (all device have same bit) or in case of
+ * a discrepancy, the 'search_direction' parameter is used.
+ *
+ * Return:
+ *  0x00-0xff - command status byte
+ *  -1        - failure
+ */
+static int ds2482_search_triplet(int search_direction);
+
+/*
+ * Send 1 bit of communication to the 1-Wire Net and return the
+ * result 1 bit read from the 1-Wire Net.
+ *
+ * Return:
+ *   0 - bit value 0 read
+ *   1 - bit value 1 read
+ *  -1 - failure
+ */
+static int ow_touch_bit(uint8_t bit);
+
+/*
+ * Send 8 bits of communication to the 1-Wire Net and return the
+ * result 8 bits read from the 1-Wire Net.
+ *
+ * Return:
+ *  0x00:0xff - byte value read
+ *  -1        - failure
+ */
+static int ow_touch_byte(uint8_t byte);
+
+/*
+ * The 'ow_search' function does a general search. This function
+ * continues from the previous search state. The search state
+ * can be reset by using the 'ow_first' function.
+ * This function contains one parameter 'alarm_only'.
+ * When 'alarm_only' is 1 (1) the find alarm command
+ * 0xEC is sent instead of the normal search command 0xF0.
+ * Using the find alarm command 0xEC will limit the search to only
+ * 1-Wire devices that are in an 'alarm' state.
+ *
+ * Return:
+ *   1 - device found
+ *   0 - device not found
+ *  -1 - failure
+ *  -2 - short detected
+ */
+static int ow_search(ow_search_t *s);
+
 int ds2482_detect(uint8_t addr) {
 	int err;
 
@@ -104,14 +157,7 @@ int ds2482_detect(uint8_t addr) {
 	return 0;
 }
 
-/*
- * Perform a device reset on the DS2482.
- *
- * Return:
- *  0 if device was reset
- *  -1 on failure
- */
-int ds2482_reset() {
+static int ds2482_reset() {
 	uint8_t status;
 
 	/*
@@ -141,15 +187,6 @@ int ds2482_reset() {
 	return 0;
 }
 
-/*
- * Write the configuration register in the DS2482. The configuration
- * options are provided in the lower nibble of the provided config byte.
- * The uppper nibble in bitwise inverted when written to the DS2482.
- *
- * Return:
- *  0 if config written and verified
- *  -1 on failure
- */
 static int ds2482_write_config() {
 	uint8_t config = 0;
 	uint8_t read_config;
@@ -195,13 +232,6 @@ static int ds2482_write_config() {
 	return 0;
 }
 
-/*
- * Select the 1-Wire channel on a DS2482-800.
- *
- * Return:
- *  0 on channel selected
- *  -1 on failure
- */
 int ds2482_channel_select(int channel) {
 	uint8_t ch, ch_read, check;
 
@@ -248,15 +278,52 @@ int ds2482_channel_select(int channel) {
 	return 0;
 }
 
-/*
- * Reset all of the devices on the 1-Wire Net and return the result.
- *
- * Return:
- *   1 - presence pulse(s) detected and device(s) reset
- *   0 - no presence pulses detected
- *  -1 - failure
- *  -2 - short detected
- */
+static int ds2482_search_triplet(int search_direction) {
+	uint8_t status;
+	int poll_count = 0;
+
+	/*
+	 * 1-Wire Triplet (Case B)
+	 *   S AD,0 [A] 1WT [A] SS [A] Sr AD,1 [A] [Status] A [Status] A\ P
+	 *                                         \--------/
+	 *                           Repeat until 1WB bit has changed to 0
+	 *  [] indicates from slave
+	 *  SS indicates byte containing search direction bit value in msbit
+	 */
+
+	if (i2c_start(s.addr | I2C_WRITE)) {
+		return -1;
+	}
+	if (i2c_write(CMD_1WT)) {
+		return -1;
+	}
+	if (i2c_write(search_direction ? 0x80 : 0x00)) {
+		return -1;
+	}
+	if (i2c_rep_start(s.addr | I2C_READ)) {
+		return -1;
+	}
+
+	// loop checking 1WB bit for completion of 1-Wire operation
+	// abort if poll limit reached
+	status = i2c_read(1);
+	do {
+		status = i2c_read(status & STATUS_1WB);
+	}
+	while ((status & STATUS_1WB) && (poll_count++ < POLL_LIMIT));
+
+	i2c_stop();
+
+	// check for failure due to poll limit reached
+	if (poll_count >= POLL_LIMIT) {
+		ds2482_reset();
+		return -1;
+	}
+
+	// return status byte
+	return status;
+}
+
 int ow_reset(void) {
 	uint8_t status;
 	int poll_count = 0;
@@ -309,31 +376,20 @@ int ow_reset(void) {
 	}
 }
 
-/*
- * Send 1 bit of communication to the 1-Wire Net.
- * The parameter 'sendbit' least significant bit is used.
- */
-void ow_write_bit(uint8_t sendbit) {
-	ow_touch_bit(sendbit);
+int ow_write_bit(uint8_t sendbit) {
+	int ret = ow_touch_bit(sendbit);
+	if (ret < 0) {
+		return ret;
+	}
+
+	return 0;
 }
 
-/*
- * Reads 1 bit of communication from the 1-Wire Net and returns the
- * result.
- *
- *
- */
-int8_t ow_read_bit(void) {
+int ow_read_bit(void) {
 	return ow_touch_bit(0x01);
 }
 
-/*
- * Send 1 bit of communication to the 1-Wire Net and return the
- * result 1 bit read from the 1-Wire Net. The parameter 'sendbit'
- * least significant bit is used and the least significant bit
- * of the result is the return bit.
- */
-int8_t ow_touch_bit(uint8_t sendbit) {
+static int ow_touch_bit(uint8_t sendbit) {
 	uint8_t status;
 	int poll_count = 0;
 
@@ -384,11 +440,6 @@ int8_t ow_touch_bit(uint8_t sendbit) {
 	}
 }
 
-/*
- * Send 8 bits of communication to the 1-Wire Net and verify that the
- * 8 bits read from the 1-Wire Net are the same (write operation).
- * The parameter 'sendbyte' least significant 8 bits are used.
- */
 int ow_write_byte(uint8_t sendbyte) {
 	uint8_t status;
 	int poll_count = 0;
@@ -434,11 +485,7 @@ int ow_write_byte(uint8_t sendbyte) {
 	return 0;
 }
 
-/*
- * Send 8 bits of read communication to the 1-Wire Net and return the
- * result 8 bits read from the 1-Wire Net.
- */
-int16_t ow_read_byte(void) {
+int ow_read_byte(void) {
 	uint8_t data, status;
 	int poll_count = 0;
 
@@ -496,60 +543,32 @@ int16_t ow_read_byte(void) {
 	return data;
 }
 
-/*
- * The 'ow_block' transfers a block of data to and from the
- * 1-Wire Net. The result is returned in the same buffer.
- */
-void ow_block(uint8_t *tran_buf, int tran_len) {
+int ow_block(uint8_t *tran_buf, int tran_len) {
 	for (int i = 0; i < tran_len; i++) {
-		tran_buf[i] = ow_touch_byte(tran_buf[i]);
+		int ret = ow_touch_byte(tran_buf[i]);
+		if (ret < 0) {
+			return ret;
+		}
+		tran_buf[i] = ret;
 	}
+
+	return 0;
 }
 
-/*
- * Send 8 bits of communication to the 1-Wire Net and return the
- * result 8 bits read from the 1-Wire Net.
- */
-uint8_t ow_touch_byte(uint8_t sendbyte) {
+static int ow_touch_byte(uint8_t sendbyte) {
 	if (sendbyte == 0xFF) {
 		return ow_read_byte();
 	}
 	else {
-		ow_write_byte(sendbyte);
+		int ret = ow_write_byte(sendbyte);
+		if (ret < 0) {
+			return ret;
+		}
 		return sendbyte;
 	}
 }
 
-/*
- * Find the 'first' devices on the 1-Wire network
- * Return 1  : device found, ROM number in ROM_NO buffer
- *        0 : no device present
- */
-int ow_first(ow_search_t *s) {
-	// reset the search state
-	s->last_discrepancy = 0;
-	s->last_device_flag = 0;
-	s->last_family_discrepancy = 0;
-
-	return ow_search(s);
-}
-
-/*
- * Find the 'next' devices on the 1-Wire network
- * Return 1  : device found, ROM number in ROM_NO buffer
- *        0 : device not found, end of search
- */
-int ow_next(ow_search_t *s) {
-	// leave the search state alone
-	return ow_search(s);
-}
-
-/*
- * Verify the device with the ROM number in ROM_NO buffer is present.
- * Return 1  : device verified present
- *        0 : device not present
- */
-int ow_verify(ow_addr_t addr) {
+int ow_presence(ow_addr_t addr) {
 	int res;
 	ow_search_t s;
 
@@ -569,11 +588,21 @@ int ow_verify(ow_addr_t addr) {
 	return res;
 }
 
-/*
- * Setup the search to find the device type 'family' on the next call
- * to OWNext() if it is present.
- */
-void ow_target_setup(ow_search_t *s, uint8_t family) {
+int ow_search_first(ow_search_t *s) {
+	// reset the search state
+	s->last_discrepancy = 0;
+	s->last_device_flag = 0;
+	s->last_family_discrepancy = 0;
+
+	return ow_search(s);
+}
+
+int ow_search_next(ow_search_t *s) {
+	// leave the search state alone
+	return ow_search(s);
+}
+
+int ow_search_target(ow_search_t *s, uint8_t family) {
 	memset(s->rom_no, 0, sizeof(s->rom_no));
 	s->last_discrepancy = 64;
 	s->last_family_discrepancy = 0;
@@ -581,13 +610,11 @@ void ow_target_setup(ow_search_t *s, uint8_t family) {
 
 	// set the search state to find SearchFamily type devices
 	s->rom_no[0] = family;
+
+	return ow_search(s);
 }
 
-/*
- * Setup the search to skip the current device type on the next call
- * to OWNext().
- */
-void ow_family_skip_setup(ow_search_t *s) {
+int ow_search_skip_family(ow_search_t *s) {
 	// set the Last discrepancy to last family discrepancy
 	s->last_discrepancy = s->last_family_discrepancy;
 
@@ -598,30 +625,16 @@ void ow_family_skip_setup(ow_search_t *s) {
 	if (s->last_discrepancy == 0) {
 		s->last_device_flag = 1;
 	}
+
+	return ow_search(s);
 }
 
-/*
- * The 'ow_search' function does a general search. This function
- * continues from the previous search state. The search state
- * can be reset by using the 'ow_first' function.
- * This function contains one parameter 'alarm_only'.
- * When 'alarm_only' is 1 (1) the find alarm command
- * 0xEC is sent instead of the normal search command 0xF0.
- * Using the find alarm command 0xEC will limit the search to only
- * 1-Wire devices that are in an 'alarm' state.
- *
- * Returns:   1 (1) : when a 1-Wire device was found and its
- *                       Serial Number placed in the global ROM
- *            0 (0): when no new device was found.  Either the
- *                       last search was the last device or there
- *                       are no devices on the 1-Wire Net.
- */
-int ow_search(ow_search_t *s) {
-//	int ret;
+static int ow_search(ow_search_t *s) {
+	int ret;
 	int id_bit_number;
 	int last_zero, rom_byte_number, search_result;
 	int id_bit, cmp_id_bit;
-	uint8_t rom_byte_mask, search_direction, status;
+	uint8_t rom_byte_mask, search_direction;
 
 	// initialize for search
 	id_bit_number = 1;
@@ -634,7 +647,11 @@ int ow_search(ow_search_t *s) {
 	// if the last call was not the last one
 	if (!s->last_device_flag) {
 		// 1-Wire reset
-		if (!ow_reset()) {
+		ret = ow_reset();
+		if (ret < 0) {
+			return ret;
+		}
+		else if (ret == 0) {
 			// reset the search
 			s->last_discrepancy = 0;
 			s->last_device_flag = 0;
@@ -643,7 +660,10 @@ int ow_search(ow_search_t *s) {
 		}
 
 		// issue the search command
-		ow_write_byte(0xF0);
+		ret = ow_write_byte(0xF0);
+		if (ret < 0) {
+			return ret;
+		}
 
 		// loop to do the search
 		do {
@@ -665,16 +685,18 @@ int ow_search(ow_search_t *s) {
 
 			// Perform a triple operation on the DS2482 which will perform
 			// 2 read bits and 1 write bit
-			status = ds2482_search_triplet(search_direction);
+			ret = ds2482_search_triplet(search_direction);
+			if (ret < 0) {
+				return ret;
+			}
 
 			// check bit results in status byte
-			id_bit = ((status & STATUS_SBR) == STATUS_SBR);
-			cmp_id_bit = ((status & STATUS_TSB) == STATUS_TSB);
-			search_direction =
-				((status & STATUS_DIR) == STATUS_DIR) ? (uint8_t)1 : (uint8_t)0;
+			id_bit = ((ret & STATUS_SBR) == STATUS_SBR);
+			cmp_id_bit = ((ret & STATUS_TSB) == STATUS_TSB);
+			search_direction = ((ret & STATUS_DIR) == STATUS_DIR) ? 1 : 0;
 
 			// check for no devices on 1-Wire
-			if ((id_bit) && (cmp_id_bit)) {
+			if (id_bit && cmp_id_bit) {
 				break;
 			}
 			else {
@@ -701,8 +723,8 @@ int ow_search(ow_search_t *s) {
 				id_bit_number++;
 				rom_byte_mask <<= 1;
 
-				// if the mask is 0 then go to new SerialNum byte rom_byte_number
-				// and reset mask
+				// if the mask is 0 then go to new SerialNum byte
+				// rom_byte_number and reset mask
 				if (rom_byte_mask == 0) {
 					// accumulate the CRC
 					s->crc = _crc_ibutton_update(s->crc,
@@ -712,7 +734,7 @@ int ow_search(ow_search_t *s) {
 				}
 			}
 		}
-		while(rom_byte_number < 8);  // loop until through all ROM bytes 0-7
+		while (rom_byte_number < 8);  // loop until through all ROM bytes 0-7
 
 		// if the search was successful then
 		if (!((id_bit_number < 65) || (s->crc != 0))) {
@@ -721,8 +743,9 @@ int ow_search(ow_search_t *s) {
 			s->last_discrepancy = last_zero;
 
 			// check for last device
-			if (s->last_discrepancy == 0)
+			if (s->last_discrepancy == 0) {
 				s->last_device_flag = 1;
+			}
 
 			search_result = 1;
 		}
@@ -730,7 +753,6 @@ int ow_search(ow_search_t *s) {
 
 	// if no device found then reset counters so next
 	// 'search' will be like a first
-
 	if (!search_result || (s->rom_no[0] == 0)) {
 		s->last_discrepancy = 0;
 		s->last_device_flag = 0;
@@ -741,65 +763,11 @@ int ow_search(ow_search_t *s) {
 	return search_result;
 }
 
-//--------------------------------------------------------------------------
-// Use the DS2482 help command '1-Wire triplet' to perform one bit of a
-//1-Wire search.
-//This command does two read bits and one write bit. The write bit
-// is either the default direction (all device have same bit) or in case of
-// a discrepancy, the 'search_direction' parameter is used.
-//
-// Returns – The DS2482 status byte result from the triplet command
-//
-uint8_t ds2482_search_triplet(int search_direction) {
-	uint8_t status;
-	int poll_count = 0;
+int ow_speed(int speed) {
+	int ret;
 
-	// 1-Wire Triplet (Case B)
-	//   S AD,0 [A] 1WT [A] SS [A] Sr AD,1 [A] [Status] A [Status] A\ P
-	//                                         \--------/
-	//                           Repeat until 1WB bit has changed to 0
-	//  [] indicates from slave
-	//  SS indicates byte containing search direction bit value in msbit
-
-	i2c_start(s.addr | I2C_WRITE);
-	i2c_write(CMD_1WT);
-	i2c_write(search_direction ? 0x80 : 0x00);
-	i2c_rep_start(s.addr | I2C_READ);
-
-	// loop checking 1WB bit for completion of 1-Wire operation
-	// abort if poll limit reached
-	status = i2c_read(1);
-	do {
-		status = i2c_read(status & STATUS_1WB);
-	}
-	while ((status & STATUS_1WB) && (poll_count++ < POLL_LIMIT));
-
-	i2c_stop();
-
-	// check for failure due to poll limit reached
-	if (poll_count >= POLL_LIMIT) {
-		// handle error
-		// ...
-		ds2482_reset();
-		return 0;
-	}
-
-	// return status byte
-	return status;
-}
-
-//--------------------------------------------------------------------------
-// Set the 1-Wire Net communication speed.
-//
-// 'new_speed' - new speed defined as
-//                MODE_STANDARD   0x00
-//                MODE_OVERDRIVE  0x01
-//
-// Returns:  current 1-Wire Net speed
-//
-int ow_speed(int new_speed) {
 	// set the speed
-	if (new_speed == MODE_OVERDRIVE) {
+	if (speed == MODE_OVERDRIVE) {
 		s.cfg_1ws = 1;
 	}
 	else {
@@ -807,93 +775,72 @@ int ow_speed(int new_speed) {
 	}
 
 	// write the new config
-	ds2482_write_config();
+	ret = ds2482_write_config();
+	if (ret < 0) {
+		return ret;
+	}
 
-	return new_speed;
+	return 0;
 }
 
-//--------------------------------------------------------------------------
-// Set the 1-Wire Net line level pullup to normal. The DS2482 only
-// allows enabling strong pullup on a bit or byte event. Consequently this
-// function only allows the MODE_STANDARD argument. To enable strong pullup
-// use ow_write_byte_power or ow_read_bit_power.
-//
-// 'new_level' - new level defined as
-//                MODE_STANDARD     0x00
-//
-// Returns:  current 1-Wire Net level
-//
-int ow_level(int new_level) {
-	// function only will turn back to non-strong pullup
-	if (new_level != MODE_STANDARD) {
-		return MODE_STRONG;
-	}
+int ow_level_std() {
+	int ret;
 
 	// clear the strong pullup bit in the global config state
 	s.cfg_spu = 0;
 
 	// write the new config
-	ds2482_write_config();
+	ret = ds2482_write_config();
+	if (ret < 0) {
+		return ret;
+	}
 
-	return MODE_STANDARD;
+	return 0;
 }
 
-//--------------------------------------------------------------------------
-// Send 1 bit of communication to the 1-Wire Net and verify that the
-// response matches the 'applyPowerResponse' bit and apply power delivery
-// to the 1-Wire net.  Note that some implementations may apply the power
-// first and then turn it off if the response is incorrect.
-//
-// 'applyPowerResponse' - 1 bit response to check, if correct then start
-//                        power delivery
-//
-// Returns:  1: bit written and response correct, strong pullup now on
-//           0: response incorrect
-//
-int ow_read_bit_power(int applyPowerResponse) {
+int ow_read_bit_power(uint8_t check_response) {
+	int ret;
 	uint8_t rdbit;
 
 	// set strong pullup enable
 	s.cfg_spu = 1;
 
 	// write the new config
-	if (!ds2482_write_config())
-		return 0;
+	ret = ds2482_write_config();
+	if (ret < 0) {
+		return ret;
+	}
 
 	// perform read bit
 	rdbit = ow_read_bit();
 
 	// check if response was correct, if not then turn off strong pullup
-	if (rdbit != applyPowerResponse) {
-		ow_level(MODE_STANDARD);
+	if (rdbit != check_response) {
+		ret = ow_level_std();
+		if (ret < 0) {
+			return ret;
+		}
 		return 0;
 	}
 
 	return 1;
 }
 
-//--------------------------------------------------------------------------
-// Send 8 bits of communication to the 1-Wire Net and verify that the
-// 8 bits read from the 1-Wire Net are the same (write operation).
-// The parameter 'sendbyte' least significant 8 bits are used. After the
-// 8 bits are sent change the level of the 1-Wire net.
-//
-// 'sendbyte' - 8 bits to send (least significant bit)
-//
-// Returns:  1: bytes written and echo was the same, strong pullup now on
-//           0: echo was not the same
-//
-int ow_write_byte_power(int sendbyte) {
+int ow_write_byte_power(uint8_t sendbyte) {
+	int ret;
+
 	// set strong pullup enable
 	s.cfg_spu = 1;
 
 	// write the new config
-	if (!ds2482_write_config())
-		return 0;
+	ret = ds2482_write_config();
+	if (ret < 0) {
+		return ret;
+	}
 
 	// perform write byte
-	ow_write_byte(sendbyte);
+	ret = ow_write_byte(sendbyte);
 
-	return 1;
+	return ret;
 }
 
