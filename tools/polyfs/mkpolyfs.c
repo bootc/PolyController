@@ -53,6 +53,84 @@
 #include <dmalloc.h>
 #endif
 
+#if defined(__APPLE__)
+#define MAP_ANONYMOUS MAP_ANON
+
+typedef uint64_t loff_t;
+
+ssize_t getline(char **lineptr, size_t *n, FILE *stream);
+
+/* PASTE REMAINDER AT BOTTOM OF FILE */
+	ssize_t
+getline(char **linep, size_t *np, FILE *stream)
+{
+	char *p = NULL;
+	size_t i = 0;
+
+	if (!linep || !np) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!(*linep) || !(*np)) {
+		*np = 120;
+		*linep = (char *)malloc(*np);
+		if (!(*linep)) {
+			return -1;
+		}
+	}
+
+	flockfile(stream);
+
+	p = *linep;
+	for (int ch = 0; (ch = getc_unlocked(stream)) != EOF;) {
+		if (i > *np) {
+			/* Grow *linep. */
+			size_t m = *np * 2;
+			char *s = (char *)realloc(*linep, m);
+
+			if (!s) {
+				int error = errno;
+				funlockfile(stream);
+				errno = error;
+				return -1;
+			}
+
+			*linep = s;
+			*np = m;
+		}
+
+		p[i] = ch;
+		if ('\n' == ch) break;
+		i += 1;
+	}
+	funlockfile(stream);
+
+	/* Null-terminate the string. */
+	if (i > *np) {
+		/* Grow *linep. */
+		size_t m = *np * 2;
+		char *s = (char *)realloc(*linep, m);
+
+		if (!s) {
+			return -1;
+		}
+
+		*linep = s;
+		*np = m;
+	}
+
+	p[i + 1] = '\0';
+	if (i > 0) {
+		return i;
+	}
+	return -1;
+}
+
+
+#endif
+
+
 /* Exit codes used by mkfs-type programs */
 #define MKFS_OK          0	/* No errors */
 #define MKFS_ERROR       8	/* Operational error */
@@ -387,11 +465,15 @@ static void eliminate_doubles(struct entry *root, struct entry *orig)
  * We define our own sorting function instead of using alphasort which
  * uses strcoll and changes ordering based on locale information.
  */
-static int cramsort (const struct dirent **a, const struct dirent **b)
-{
-	return strcmp ((*a)->d_name,
-			(*b)->d_name);
+#ifdef __APPLE__
+static int cramsort (const void *a, const void *b) {
+	return strcmp ((*(const struct dirent **)a)->d_name, (*(const struct dirent **)b)->d_name);
 }
+#else
+static int cramsort (const struct dirent **a, const struct dirent **b) {
+	return strcmp ((*a)->d_name, (*b)->d_name);
+}
+#endif
 
 static unsigned int parse_directory(struct entry *root_entry, const char *name, struct entry **prev, loff_t *fslen_ub)
 {

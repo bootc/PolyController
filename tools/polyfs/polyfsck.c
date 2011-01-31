@@ -51,13 +51,19 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#ifndef __APPLE__
 #include <sys/sysmacros.h>
+#endif
 #include <utime.h>
 #include <sys/ioctl.h>
 #define _LINUX_STRING_H_
 #include "polyfs/polyfs_fs.h"
 #include <zlib.h>
 #include <lzo/lzo1x.h>
+
+#ifdef __APPLE__
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 
 #define BLKGETSIZE	_IO(0x12,96) /* return device size /512 (long *arg) */
 

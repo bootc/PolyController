@@ -647,7 +647,7 @@ distclean: clean
 # Target: clean project.
 clean: begin config clean_list end
 
-clean_list :
+clean_list : $(EXTRA_CLEAN_RULES)
 	@echo
 	@echo $(MSG_CLEANING)
 	$(REMOVE) $(TARGET).hex

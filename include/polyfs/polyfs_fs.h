@@ -51,6 +51,13 @@
 #define S_ISFIFO(m)     (((m) & S_IFMT) == S_IFIFO)
 #define S_ISSOCK(m)     (((m) & S_IFMT) == S_IFSOCK)
 
+#elif __APPLE__
+
+#include <machine/endian.h>
+#define __BYTE_ORDER __DARWIN_BYTE_ORDER
+#define __LITTLE_ENDIAN __DARWIN_LITTLE_ENDIAN
+#define __BIG_ENDIAN __DARWIN_BIG_ENDIAN
+
 #else
 #include <byteswap.h>
 #include <endian.h>
