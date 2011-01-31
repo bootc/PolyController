@@ -5,6 +5,7 @@ POLYFSCK := $(curdir)/polyfs/polyfsck
 EXTRA_CLEAN_RULES += $(curdir)/polyfs_clean
 
 $(MKPOLYFS): $(curdir)/polyfs
+$(POLYFSCK): $(curdir)/polyfsck
 
 $(curdir)/polyfs:
 	$(MAKE) -C $(curdir)/polyfs/
