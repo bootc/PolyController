@@ -18,8 +18,8 @@
  * MA 02110-1301, USA.
  */
 
-#ifndef __POLYFS_DF_H__
-#define __POLYFS_DF_H__
+#ifndef __POLYFS_CFS_H__
+#define __POLYFS_CFS_H__
 
 #include <polyfs.h>
 #include <cfs/cfs.h>
