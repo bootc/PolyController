@@ -1,6 +1,19 @@
 
-* DS2482-100 driver (1-wire)
+* Command-line CFS/PolyFS peeking
+* Command-line 1-wire peeking
+* Command-line clock manipulation (RTC/wallclock/NTP)
+* Command-line sensor interface
+* Command-line owfs interface
 
+* Configuration framework
+ * EEPROM read/write
+ * Config backup/restore
+* Sensor framework
+ * Individual sensors (1-wire or owfs)
+ * Sensor groups (with consolidation functions)
+
+* NTP server from DHCP/config
+* Syslog sender
 * OWFS client (to pull values from owfs)
 * PID controller
 * Scheduling/calendar tool
@@ -11,4 +24,3 @@
 
 Maybes?
 ? xAP node thingy
-
