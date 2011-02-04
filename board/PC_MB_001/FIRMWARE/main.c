@@ -32,6 +32,14 @@
 #include "apps/shell/shell-ps.h"
 #include "apps/shell/shell-netstat.h"
 #include "apps/timesync.h"
+#if CONFIG_APPS_WEBSERVER
+#include "apps/webserver/webserver.h"
+#endif
+
+#if CONFIG_LIB_FLASHMGT
+#include <polyfs.h>
+#include <flashmgt.h>
+#endif
 
 PROCINIT(
 	&etimer_process,
@@ -40,6 +48,9 @@ PROCINIT(
 	&dhcp_process,
 	&timesync_process,
 	&serial_line_process,
+#if CONFIG_APPS_WEBSERVER
+	&webserver_process,
+#endif
 	&monitor_process);
 
 int main(void) {
@@ -47,6 +58,10 @@ int main(void) {
 	clock_init();
 
 	sei();
+
+#if CONFIG_LIB_FLASHMGT
+	flashmgt_init();
+#endif
 
 	/* Initialize drivers and event kernel */
 	process_init();
