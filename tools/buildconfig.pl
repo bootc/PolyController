@@ -64,7 +64,9 @@ print CONFIG_H <<EOF;
  */
 
 #define CONFIG_BOARD "$board"
+#define CONFIG_BOARD_$board 1
 #define CONFIG_IMAGE "$image"
+#define CONFIG_IMAGE_$image 1
 
 EOF
 
@@ -79,7 +81,9 @@ print CONFIG_MK <<EOF;
 #
 
 CONFIG_BOARD=$board
+CONFIG_BOARD_$board=y
 CONFIG_IMAGE=$image
+CONFIG_IMAGE_$image=y
 
 EOF
 
