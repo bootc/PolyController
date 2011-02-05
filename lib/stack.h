@@ -22,7 +22,8 @@
 #define _STACK_H_
 
 extern uint8_t _end;
-extern uint8_t __stack; 
+extern uint8_t __stack;
+extern char *__brkval;
 
 uint16_t StackCount(void);
 
