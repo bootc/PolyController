@@ -35,6 +35,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <avr/pgmspace.h>
 
 #include "contiki-net.h"
@@ -60,7 +61,11 @@
 
 //#define MIN(a, b) ((a) < (b)? (a): (b))
 
+#if 0
 MEMB(conns, struct httpd_state, CONNS);
+#else
+static uint8_t conns_free = CONNS;
+#endif
 
 #define ISO_tab     0x09
 #define ISO_nl      0x0a
@@ -417,11 +422,26 @@ void httpd_appcall(void *state) {
 				cfs_close(s->fd);
 				s->fd = -1;
 			}
+#if 0
 			memb_free(&conns, s);
+#else
+			free(s);
+			conns_free++;
+#endif
 		}
 	}
 	else if (uip_connected()) {
+#if 0
 		s = (struct httpd_state *)memb_alloc(&conns);
+#else
+		if (conns_free) {
+			s = malloc(sizeof(*s));
+			conns_free--;
+		}
+		else {
+			s = NULL;
+		}
+#endif
 
 		if (s == NULL) {
 			uip_abort();
@@ -447,7 +467,12 @@ void httpd_appcall(void *state) {
 					cfs_close(s->fd);
 					s->fd = -1;
 				}
+#if 0
 				memb_free(&conns, s);
+#else
+				free(s);
+				conns_free++;
+#endif
 				webserver_log_file(&uip_conn->ripaddr, "reset (timeout)");
 			}
 		}
@@ -464,7 +489,9 @@ void httpd_appcall(void *state) {
 
 void httpd_init(void) {
 	tcp_listen(UIP_HTONS(80));
+#if 0
 	memb_init(&conns);
+#endif
 }
 
 #if UIP_CONF_IPV6
