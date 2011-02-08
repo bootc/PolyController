@@ -29,35 +29,14 @@
 #include "timesync.h"
 
 #include "drivers/wallclock.h"
-#include "lib/stack.h"
 
 #include <stdio.h>
 #include <avr/pgmspace.h>
 #include <sys/stimer.h>
 
-#if !defined(RAMSTART)
-#define RAMSTART (0x100)
-#endif
-#if !defined(RAMSIZE)
-#define RAMSIZE (RAMEND - RAMSTART)
-#endif
-
 PROCESS(monitor_process, "Monitor");
 
-PROCESS(shell_free_process, "free");
-SHELL_COMMAND(free_command,
-	"free", "free: show memory usage",
-	&shell_free_process);
-
-#if PROCESS_CONF_STATS
-extern process_num_events_t process_maxevents;
-#endif
-
 static struct etimer heartbeat;
-
-void monitor_init(void) {
-	shell_register_command(&free_command);
-}
 
 static void log_message_P(PGM_P fmt, ...) {
 	va_list argp;
@@ -141,33 +120,6 @@ PROCESS_THREAD(monitor_process, ev, data) {
 			LOADER_UNLOAD();
 		}
 	}
-
-	PROCESS_END();
-}
-
-PROCESS_THREAD(shell_free_process, ev, data) {
-	PROCESS_BEGIN();
-
-	const uint16_t stack_size = ((uint16_t)&__stack - (uint16_t)&_end) + 1;
-	uint16_t stack_free = StackCount();
-
-	shell_output_P(&free_command,
-		PSTR("           total        used        free"));
-
-	shell_output_P(&free_command,
-		PSTR("Stack:      %4d        %4d        %4d"),
-		stack_size, stack_size - stack_free, stack_free);
-
-	shell_output_P(&free_command,
-		PSTR("Heap:       %4d        %4d        %4d"),
-		RAMSIZE - stack_size, RAMSIZE - stack_size, 0);
-
-#if PROCESS_CONF_STATS
-
-	shell_output_P(&free_command, PSTR(""));
-	shell_output_P(&free_command, PSTR("Max Events: %d"),
-		process_maxevents);
-#endif
 
 	PROCESS_END();
 }

@@ -29,8 +29,15 @@
 #include "apps/dhcp.h"
 #include "apps/monitor.h"
 #include "apps/serial-shell.h"
+#if CONFIG_APPS_SHELL_FREE
+#include "apps/shell/shell-free.h"
+#endif
+#if CONFIG_APPS_SHELL_PS
 #include "apps/shell/shell-ps.h"
+#endif
+#if CONFIG_APPS_SHELL_NETSTAT
 #include "apps/shell/shell-netstat.h"
+#endif
 #include "apps/timesync.h"
 #if CONFIG_APPS_WEBSERVER
 #include "apps/webserver/webserver.h"
@@ -69,9 +76,15 @@ int main(void) {
 
 	serial_line_init();
 	serial_shell_init();
+#if CONFIG_APPS_SHELL_FREE
+	shell_free_init();
+#endif
+#if CONFIG_APPS_SHELL_PS
 	shell_ps_init();
+#endif
+#if CONFIG_APPS_SHELL_NETSTAT
 	shell_netstat_init();
-	monitor_init();
+#endif
 
 	while (1) {
 		// Run processes
