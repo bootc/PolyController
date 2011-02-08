@@ -30,7 +30,6 @@
 
 #include "drivers/wallclock.h"
 #include "lib/stack.h"
-#include "lib/polyfs.h"
 
 #include <stdio.h>
 #include <avr/pgmspace.h>
@@ -50,11 +49,6 @@ SHELL_COMMAND(free_command,
 	"free", "free: show memory usage",
 	&shell_free_process);
 
-PROCESS(polyfs_test_process, "polyfs test");
-SHELL_COMMAND(polyfs_test_command,
-	"polyfs", "polyfs: test polyfs capability",
-	&polyfs_test_process);
-
 #if PROCESS_CONF_STATS
 extern process_num_events_t process_maxevents;
 #endif
@@ -63,7 +57,6 @@ static struct etimer heartbeat;
 
 void monitor_init(void) {
 	shell_register_command(&free_command);
-	shell_register_command(&polyfs_test_command);
 }
 
 static void log_message_P(PGM_P fmt, ...) {
@@ -175,15 +168,6 @@ PROCESS_THREAD(shell_free_process, ev, data) {
 	shell_output_P(&free_command, PSTR("Max Events: %d"),
 		process_maxevents);
 #endif
-
-	PROCESS_END();
-}
-
-PROCESS_THREAD(polyfs_test_process, ev, data) {
-	PROCESS_BEGIN();
-
-	//polyfs_test();
-	shell_output_P(&polyfs_test_command, PSTR("FIXME: unimplemented"));
 
 	PROCESS_END();
 }
