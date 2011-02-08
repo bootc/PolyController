@@ -53,6 +53,8 @@ typedef struct {
 int polyfs_init(void);
 int polyfs_fs_open(polyfs_fs_t *fs);
 
+int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize);
+
 int32_t polyfs_fread(polyfs_fs_t *fs, const struct polyfs_inode *inode,
 	void *ptr, uint32_t offset, uint32_t bytes);
 

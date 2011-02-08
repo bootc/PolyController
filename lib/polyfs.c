@@ -51,6 +51,9 @@ static inline int read_storage_uint32(polyfs_fs_t *fs,
 // Read the filesystem superblock
 static int read_super(polyfs_fs_t *fs);
 
+// Calculate a CRC-32 checksum
+static uint32_t crc32(uint32_t crc, uint8_t *buffer, uint32_t length);
+
 int polyfs_init(void) {
 	int err = 0;
 
@@ -77,6 +80,51 @@ int polyfs_fs_open(polyfs_fs_t *fs) {
 	err = read_super(fs);
 	if (err) {
 		return err;
+	}
+
+	return 0;
+}
+
+int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
+	uint32_t crc = crc32(0, NULL, 0);
+	uint32_t size = 0;
+	uint32_t read_crc = 0;
+	int length = 0;
+	int ret;
+
+	while (1) {
+		// Read a block of FS data
+		ret = read_storage(fs, temp, length, tempsize);
+		if (ret < 0) {
+			return -1;
+		}
+		else if (ret == 0) {
+			break;
+		}
+
+		// If we've just read the superblock, extract some info
+		if (length == 0) {
+			struct polyfs_super *super = (struct polyfs_super *)temp;
+			size = super->size;
+			read_crc = super->fsid.crc;
+
+			// Wipe the CRC from the block we read so the calculation is valid
+			super->fsid.crc = crc32(0, NULL, 0);
+		}
+
+		length += ret;
+
+		// Reached the end of the filesystem
+		if (length > size) {
+			crc = crc32(crc, temp, ret - (length - size));
+			break;
+		}
+
+		crc = crc32(crc, temp, ret);
+	}
+
+	if (crc != read_crc) {
+		return -1;
 	}
 
 	return 0;
@@ -429,5 +477,30 @@ static int read_super(polyfs_fs_t *fs) {
 	fs->root = super.root;
 
 	return 0;
+}
+
+// CCITT CRC-32 (Autodin II) polynomial:
+// X32+X26+X23+X22+X16+X12+X11+X10+X8+X7+X5+X4+X2+X+1
+
+static uint32_t crc32(uint32_t crc, uint8_t *buffer, uint32_t length) {
+	if (buffer == NULL) {
+		return 0;
+	}
+
+	crc ^= 0xffffffffUL;
+
+	while (length--) {
+		crc = crc ^ *buffer++;
+		for (int i = 0; i < 8; i++) {
+			if (crc & 1) {
+				crc = (crc >> 1) ^ 0xedb88320UL;
+			}
+			else {
+				crc = crc >> 1;
+			}
+		}
+	}
+
+	return crc ^ 0xffffffffUL;
 }
 
