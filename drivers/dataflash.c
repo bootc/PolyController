@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
+#include <init.h>
 
 #include "dataflash.h"
 #include "spi.h"
@@ -103,7 +104,7 @@ static inline void send_address(uint32_t addr) {
 	}
 }
 
-int dataflash_init(void) {
+static void dataflash_init(void) {
 	// Make sure CS is pulled high (release device)
 	CONFIG_DRIVERS_DATAFLASH_DDR |= _BV(CONFIG_DRIVERS_DATAFLASH_CS);
 	CONFIG_DRIVERS_DATAFLASH_PORT |= _BV(CONFIG_DRIVERS_DATAFLASH_CS);
@@ -118,13 +119,13 @@ int dataflash_init(void) {
 		(id.devid1 != DEV_ID_AT26DF081A_P1) ||
 		(id.devid2 != DEV_ID_AT26DF081A_P2))
 	{
-		return -1;
+		return;
 	}
 
 	// save state
 	status.inited = 1;
 
-	return 0;
+	return;
 }
 
 int dataflash_read_id(dataflash_id_t *id, uint8_t *extinfo, uint8_t bufsz) {
@@ -759,4 +760,6 @@ int dataflash_write_data(void *buf, uint32_t addr, uint8_t bytes) {
 
 	return bytes;
 }
+
+INIT_DRIVER(dataflash, dataflash_init);
 

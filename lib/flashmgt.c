@@ -23,6 +23,7 @@
 #include <polyfs_df.h>
 #include <polyfs_cfs.h>
 #include <avr/eeprom.h>
+#include <init.h>
 
 #include "flashmgt.h"
 
@@ -43,12 +44,14 @@ static struct flashmgt_partition part[] = {
 
 struct flashmgt_status flashmgt_status_ee EEMEM;
 struct flashmgt_status flashmgt_status;
-polyfs_fs_t flashmgt_pfs;
+polyfs_fs_t *flashmgt_pfs;
+polyfs_fs_t flashmgt_pfs_struct;
 
-int flashmgt_init(void) {
+static void flashmgt_init(void) {
 	int ret;
 
 	// Nullify in case we run into trouble
+	flashmgt_pfs = NULL;
 	polyfs_cfs_fs = NULL;
 
 	// FIXME: read EEPROM to work out primary partition
@@ -57,16 +60,17 @@ int flashmgt_init(void) {
 	int pri = 0;
 
 	// Try to open the filesystem
-	ret = pfsdf_open(&flashmgt_pfs, part[pri].start, part[pri].len);
+	ret = pfsdf_open(&flashmgt_pfs_struct, part[pri].start, part[pri].len);
 	if (ret < 0) {
-		return ret;
+		return;
 	}
 
 	// Set up the CFS FS pointer
-	polyfs_cfs_fs = &flashmgt_pfs;
+	flashmgt_pfs = &flashmgt_pfs_struct;
+	polyfs_cfs_fs = flashmgt_pfs;
 
-	return 0;
+	return;
 }
 
-
+INIT_LIBRARY(flashmgt, flashmgt_init);
 

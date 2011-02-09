@@ -18,25 +18,9 @@
  * MA 02110-1301, USA.
  */
 
-#ifndef __FLASHMGT_H__
-#define __FLASHMGT_H__
+#ifndef APPS_SERIAL_H
+#define APPS_SERIAL_H
 
-extern polyfs_fs_t *flashmgt_pfs;
-
-int flashmgt_sec_open(polyfs_fs_t *ptr);
-int flashmgt_sec_close(polyfs_fs_t *ptr);
-
-int flashmgt_sec_write_start(void);
-int flashmgt_sec_write_block(uint32_t offset, uint32_t len);
-int flashmgt_sec_write_abort(void);
-int flashmgt_sec_write_finish(void);
-
-#if CONFIG_IMAGE_BOOTLOADER
-
-int flashmgt_check_pending(void);
-int flashmgt_swap_partitions(void);
+PROCESS_NAME(serial_process);
 
 #endif
-
-#endif
-

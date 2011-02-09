@@ -63,6 +63,7 @@
 
 #include "sys/process.h"
 #include <avr/pgmspace.h>
+#include <init.h>
 
 /**
  * \brief      Holds a information about a shell command
@@ -205,6 +206,10 @@ static struct shell_command name = { NULL, shell_command_##name##_cmd_str, \
                                      shell_command_##name##_desc_str, process }
 
 
+#define INIT_SHELL_COMMAND(name) \
+	INIT_COMPONENT(name) \
+	{ shell_register_command(&name); }
+
 /**
  * \brief      Output data from a shell command
  * \param c    The command that outputs data
@@ -338,47 +343,6 @@ struct shell_input {
 /**
  * @}
  */
-
-#include "shell-base64.h"
-#include "shell-blink.h"
-#include "shell-checkpoint.h"
-#include "shell-collect-view.h"
-#include "shell-coffee.h"
-#include "shell-download.h"
-#include "shell-exec.h"
-#include "shell-file.h"
-#include "shell-httpd.h"
-#include "shell-irc.h"
-#include "shell-memdebug.h"
-#include "shell-netfile.h"
-#include "shell-netperf.h"
-#include "shell-netstat.h"
-#include "shell-ping.h"
-#include "shell-power.h"
-#include "shell-powertrace.h"
-#include "shell-ps.h"
-#include "shell-reboot.h"
-#include "shell-rime-debug.h"
-#include "shell-rime-debug-runicast.h"
-#include "shell-rime-neighbors.h"
-#include "shell-rime-netcmd.h"
-#include "shell-rime-ping.h"
-#include "shell-rime-sendcmd.h"
-#include "shell-rime-sniff.h"
-#include "shell-rime-unicast.h"
-#include "shell-rime.h"
-#include "shell-rsh.h"
-#include "shell-run.h"
-#include "shell-sendtest.h"
-#include "shell-sensortweet.h"
-#include "shell-sky.h"
-#include "shell-tcpsend.h"
-#include "shell-text.h"
-#include "shell-time.h"
-#include "shell-tweet.h"
-#include "shell-udpsend.h"
-#include "shell-vars.h"
-#include "shell-wget.h"
 
 #endif /* __SHELL_H__ */
 

@@ -44,29 +44,22 @@
 #include <stdio.h>
 #include <string.h>
 
-/*---------------------------------------------------------------------------*/
 PROCESS(shell_ps_process, "ps");
 SHELL_COMMAND(ps_command,
-	      "ps",
-	      "ps: list all running processes",
-	      &shell_ps_process);
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(shell_ps_process, ev, data)
-{
-  struct process *p;
-  PROCESS_BEGIN();
+	"ps",
+	"ps: list all running processes",
+	&shell_ps_process);
+INIT_SHELL_COMMAND(ps_command);
 
-  shell_output_P(&ps_command, PSTR("Processes:"));
-  for(p = PROCESS_LIST(); p != NULL; p = p->next) {
-    shell_output_P(&ps_command, PSTR("%S"), p->name);
-  }
+PROCESS_THREAD(shell_ps_process, ev, data) {
+	struct process *p;
+	PROCESS_BEGIN();
 
-  PROCESS_END();
+	shell_output_P(&ps_command, PSTR("Processes:"));
+	for (p = PROCESS_LIST(); p != NULL; p = p->next) {
+		shell_output_P(&ps_command, PSTR("%S"), p->name);
+	}
+
+	PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
-void
-shell_ps_init(void)
-{
-  shell_register_command(&ps_command);
-}
-/*---------------------------------------------------------------------------*/
+

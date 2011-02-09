@@ -35,6 +35,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <init.h>
 
 #include "contiki.h"
 #include "sys/log.h"
@@ -44,8 +45,7 @@
 #include "httpd.h"
 
 PROCESS(webserver_process, "Web server");
-
-AUTOSTART_PROCESSES(&webserver_process);
+INIT_PROCESS(webserver_process);
 
 PROCESS_THREAD(webserver_process, ev, data) {
 	PROCESS_BEGIN();

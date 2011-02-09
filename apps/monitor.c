@@ -19,6 +19,7 @@
  */
 
 #include <contiki-net.h>
+#include <init.h>
 #include "monitor.h"
 
 #include "network.h"
@@ -35,6 +36,7 @@
 #include <sys/stimer.h>
 
 PROCESS(monitor_process, "Monitor");
+INIT_PROCESS(monitor_process);
 
 static struct etimer heartbeat;
 

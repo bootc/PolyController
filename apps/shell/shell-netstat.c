@@ -97,6 +97,7 @@ SHELL_COMMAND(netstat_command,
 		"netstat",
 		"netstat: show UDP and TCP connections",
 		&shell_netstat_process);
+INIT_SHELL_COMMAND(netstat_command);
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(shell_netstat_process, ev, data)
 {

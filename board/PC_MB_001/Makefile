@@ -31,8 +31,11 @@ F_CPU = 12000000
 #     be equal to F_CPU.
 F_CLOCK = $(F_CPU)
 
+LDFLAGS += -T$(BOARD_DIR)/link.x
+
 $(curdir)-y += board.c
 $(curdir)-$(CONFIG_LIB_CONTIKI) += clock.c
+$(curdir)-$(CONFIG_LIB_CONTIKI) += main.c
 
 $(curdir)-y += $(IMAGE)/
 $(eval $(call subdir,$(curdir)))

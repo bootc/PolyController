@@ -43,6 +43,6 @@
 
 #include "contiki.h"
 
-void serial_shell_init(void);
+PROCESS_NAME(serial_shell_process);
 
 #endif /* __SERIAL_SHELL_H__ */

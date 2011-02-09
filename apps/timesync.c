@@ -21,6 +21,7 @@
 #include <contiki-net.h>
 #include <sys/stimer.h>
 #include <stdlib.h>
+#include <init.h>
 #include "timesync.h"
 
 #include "drivers/ds1307.h"
@@ -33,6 +34,7 @@
 #include <avr/pgmspace.h>
 
 PROCESS(timesync_process, "SNTP");
+INIT_PROCESS(timesync_process);
 
 timesync_status_t timesync_status;
 process_event_t timesync_event;

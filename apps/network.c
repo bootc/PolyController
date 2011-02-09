@@ -21,6 +21,7 @@
 #include <contiki-net.h>
 #include <net/tcpdump.h>
 #include <sys/log.h>
+#include <init.h>
 
 #include "network.h"
 
@@ -55,6 +56,8 @@ static struct timer arp_timer;
 #endif
 
 PROCESS(network_process, "Network");
+INIT_PROCESS(network_process);
+INIT_PROCESS(tcpip_process);
 
 #if TCPDUMP
 static void tcpdump(uint8_t *pkt, uint16_t len) {

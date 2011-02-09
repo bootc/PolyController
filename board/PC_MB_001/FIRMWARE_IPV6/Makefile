@@ -24,8 +24,6 @@ FSFILES := $(shell find $(IMAGE_DIR)/fsroot -mindepth 1 -name .svn -prune -o -pr
 $(IMAGE_DIR)/fsroot: $(FSFILES)
 	touch $(IMAGE_DIR)/fsroot
 
-$(curdir)-y += main.c
-
 EXTRA_BUILD_RULES += pfs
 EXTRA_CLEAN_FILES += $(TARGET).bin $(TARGET).pfs
 EXTRA_CLEAN_DIRS += $(BUILDDIR)/fsroot

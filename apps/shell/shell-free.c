@@ -37,6 +37,7 @@ PROCESS(shell_free_process, "free");
 SHELL_COMMAND(shell_free_command,
 	"free", "free: show memory usage",
 	&shell_free_process);
+INIT_SHELL_COMMAND(shell_free_command);
 
 #if PROCESS_CONF_STATS
 extern process_num_events_t process_maxevents;

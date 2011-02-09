@@ -3,6 +3,7 @@ EXTRAINCDIRS += $(curdir)/
 
 $(curdir)-$(CONFIG_LIB_CONTIKI) += contiki/
 $(curdir)-$(CONFIG_LIB_FLASHMGT) += flashmgt.c
+$(curdir)-$(CONFIG_LIB_INIT) += init.c
 $(curdir)-$(CONFIG_LIB_LZO) += minilzo/minilzo.c
 $(curdir)-$(CONFIG_LIB_POLYFS) += polyfs.c
 $(curdir)-$(CONFIG_LIB_POLYFS_CFS) += polyfs_cfs.c

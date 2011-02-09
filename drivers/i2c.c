@@ -8,6 +8,7 @@
 **************************************************************************/
 #include <inttypes.h>
 #include <compat/twi.h>
+#include <init.h>
 
 #include "i2c.h"
 
@@ -195,3 +196,6 @@ unsigned char i2c_readNak(void)
     return TWDR;
 
 }/* i2c_readNak */
+
+INIT_DRIVER(i2c, i2c_init);
+

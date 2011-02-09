@@ -19,77 +19,25 @@
  */
 
 #include <contiki-net.h>
-#include <dev/serial-line.h>
 
 #include <stdio.h>
 #include <avr/pgmspace.h>
 
-#include "board.h"
-#include "apps/network.h"
-#include "apps/monitor.h"
-#include "apps/serial-shell.h"
-#if CONFIG_APPS_SHELL_FREE
-#include "apps/shell/shell-free.h"
-#endif
-#if CONFIG_APPS_SHELL_PS
-#include "apps/shell/shell-ps.h"
-#endif
-#if CONFIG_APPS_SHELL_NETSTAT
-#include "apps/shell/shell-netstat.h"
-#endif
-#include "apps/timesync.h"
-#if CONFIG_APPS_WEBSERVER
-#include "apps/webserver/webserver.h"
-#endif
-
-#if CONFIG_DRIVERS_I2C
-#include "drivers/i2c.h"
-#endif
-
-#if CONFIG_LIB_FLASHMGT
-#include <polyfs.h>
-#include <flashmgt.h>
-#endif
-
-PROCINIT(
-	&etimer_process,
-	&tcpip_process,
-	&network_process,
-	&timesync_process,
-	&serial_line_process,
-#if CONFIG_APPS_WEBSERVER
-	&webserver_process,
-#endif
-	&monitor_process);
+#include <init.h>
+#include <board.h>
 
 int main(void) {
+	// Basic board init
 	board_init();
+
+	// Start the main clock
 	clock_init();
 
+	// Enable interrupts
 	sei();
 
-#if CONFIG_DRIVERS_I2C
-	i2c_init();
-#endif
-#if CONFIG_LIB_FLASHMGT
-	flashmgt_init();
-#endif
-
-	/* Initialize drivers and event kernel */
-	process_init();
-	procinit_init();
-
-	serial_line_init();
-	serial_shell_init();
-#if CONFIG_APPS_SHELL_FREE
-	shell_free_init();
-#endif
-#if CONFIG_APPS_SHELL_PS
-	shell_ps_init();
-#endif
-#if CONFIG_APPS_SHELL_NETSTAT
-	shell_netstat_init();
-#endif
+	// Initialise everything else
+	init_doinit();
 
 	while (1) {
 		// Run processes
@@ -98,6 +46,9 @@ int main(void) {
 
 	return 0;
 }
+
+INIT_LIBRARY(process, process_init);
+INIT_PROCESS(etimer_process);
 
 #if LOG_CONF_ENABLED
 void log_message(const char *part1, const char *part2) {

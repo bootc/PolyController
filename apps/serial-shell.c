@@ -45,6 +45,7 @@
 
 #include <contiki-net.h>
 #include <dev/serial-line.h>
+#include <init.h>
 #include "shell/shell.h"
 
 #include <stdio.h>
@@ -54,6 +55,7 @@
 
 /*---------------------------------------------------------------------------*/
 PROCESS(serial_shell_process, "Contiki serial shell");
+INIT_PROCESS(serial_shell_process);
 /*---------------------------------------------------------------------------*/
 void
 shell_default_output(const char *text1, int len1, const char *text2, int len2)
@@ -90,12 +92,6 @@ PROCESS_THREAD(serial_shell_process, ev, data)
 	}
 
 	PROCESS_END();
-}
-/*---------------------------------------------------------------------------*/
-	void
-serial_shell_init(void)
-{
-	process_start(&serial_shell_process, NULL);
 }
 /*---------------------------------------------------------------------------*/
 /** @} */

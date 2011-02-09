@@ -18,13 +18,15 @@
  * MA 02110-1301, USA.
  */
 
-#include "contiki-net.h"
+#include <contiki-net.h>
 #include "network.h"
 #include "dhcp.h"
+#include <init.h>
 
 #define DHCPC_CLIENT_PORT  68
 
 PROCESS(dhcp_process, "DHCP");
+INIT_PROCESS(dhcp_process);
 
 process_event_t dhcp_event;
 dhcp_status_t dhcp_status;

@@ -43,7 +43,6 @@ typedef struct {
 #define DATAFLASH_SREG_WEL 0x02
 #define DATAFLASH_SREG_BUSY 0x01
 
-int dataflash_init(void);
 int dataflash_read_id(dataflash_id_t *id, uint8_t *extinfo, uint8_t bufsz);
 
 // For sector protection sectors only
