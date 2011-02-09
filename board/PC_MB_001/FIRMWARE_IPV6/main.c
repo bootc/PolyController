@@ -42,6 +42,10 @@
 #include "apps/webserver/webserver.h"
 #endif
 
+#if CONFIG_DRIVERS_I2C
+#include "drivers/i2c.h"
+#endif
+
 #if CONFIG_LIB_FLASHMGT
 #include <polyfs.h>
 #include <flashmgt.h>
@@ -64,6 +68,9 @@ int main(void) {
 
 	sei();
 
+#if CONFIG_DRIVERS_I2C
+	i2c_init();
+#endif
 #if CONFIG_LIB_FLASHMGT
 	flashmgt_init();
 #endif

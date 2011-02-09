@@ -41,7 +41,7 @@ static volatile uint32_t seconds;
  */
 
 
-#define PRESCALER 256UL
+#define PRESCALER CONFIG_CLOCK_PRESCALER
 #define OCRMATCHVAL ((F_CPU * 10 / PRESCALER / CLOCK_SECOND + 5) / 10 - 1)
 
 #if CLOCK_SECOND != 375 || F_CPU != 12000000 || PRESCALER != 256
