@@ -96,6 +96,7 @@ PROCESS_THREAD(monitor_process, ev, data) {
 			}
 		}
 #endif
+#if CONFIG_APPS_TIMESYNC
 		else if (ev == timesync_event) {
 			log_message_P(PSTR("\rTimeSync: %Srunning, %Sin sync"),
 				timesync_status.running ? PSTR("") : PSTR("not "),
@@ -107,6 +108,7 @@ PROCESS_THREAD(monitor_process, ev, data) {
 			log_message_P(PSTR("Wallclock: Time is %lu.%04lus"),
 				time.sec, ms);
 		}
+#endif
 		else if (ev == PROCESS_EVENT_TIMER) {
 			if (data == &heartbeat &&
 				etimer_expired(&heartbeat))
