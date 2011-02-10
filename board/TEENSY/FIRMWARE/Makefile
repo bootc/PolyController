@@ -1,0 +1,2 @@
+
+$(eval $(call subdir,$(curdir)))
