@@ -70,6 +70,7 @@ static void pollhandler(void) {
 
 		// Handle '\r' and add an extra '\n'
 		if ((c & 0xff) == '\r') {
+			uart_putc('\n');
 			serial_line_input_byte('\n');
 		}
 	};
