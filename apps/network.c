@@ -241,7 +241,7 @@ static void update_status(void) {
 #endif
 
 	// Check if the flags have changed
-	if (memcmp(&new, &net_flags, sizeof(net_flags)) == 0) {
+	if (memcmp(&new, &net_flags, sizeof(net_flags)) != 0) {
 		net_flags = new;
 
 		// Send link change event
