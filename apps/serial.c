@@ -40,6 +40,7 @@ static void serial_init(void) {
 		(UBRRL_VALUE << 0) |
 		(USE_2X ? 0x8000 : 0));
 
+#if CONFIG_UART1_BAUD
 #undef BAUD
 #define BAUD CONFIG_UART1_BAUD
 #include <util/setbaud.h>
@@ -47,6 +48,7 @@ static void serial_init(void) {
 		(UBRRH_VALUE << 8) |
 		(UBRRL_VALUE << 0) |
 		(USE_2X ? 0x8000 : 0));
+#endif
 }
 
 static void pollhandler(void) {
@@ -55,11 +57,13 @@ static void pollhandler(void) {
 	while (1) {
 		// Read a character
 		uint16_t c = uart_getc();
-		
+
 		// Buffer is empty?
 		if (c & UART_NO_DATA) {
 			break;
 		}
+
+		uart_putc(c);
 
 		// Send it into contiki
 		serial_line_input_byte(c);
