@@ -31,8 +31,11 @@
 
 // This gets called to set up the IO pins
 void board_init(void) {
+	// Set clock prescaler to 2
+	CLKPR = _BV(CLKPCE);
+	CLKPR = _BV(CLKPS0);
 
-
+	// Twiddle ports for LEDs
 	DDRD = _BV(PIND6) | _BV(PIND7) | _BV(PIND3);
 	PORTD = _BV(PIND6) | _BV(PIND7);
 
