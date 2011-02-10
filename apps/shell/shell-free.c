@@ -19,6 +19,7 @@
  */
 
 #include <contiki.h>
+#include <stdarg.h>
 #include "shell-free.h"
 #include "shell.h"
 

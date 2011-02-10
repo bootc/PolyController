@@ -38,7 +38,8 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#include "contiki.h"
+#include <contiki.h>
+#include <stdarg.h>
 #include "shell-ps.h"
 
 #include <stdio.h>

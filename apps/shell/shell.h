@@ -170,8 +170,7 @@ void shell_prompt_P(PGM_P prompt);
  *             part (a dynamically generated string).
  *
  */
-void shell_default_output(const char *data1, int size1,
-			  const char *data2, int size2);
+void shell_default_output(PGM_P fmt, va_list args);
 
 /**
  * @}

@@ -46,27 +46,20 @@
 #include <contiki-net.h>
 #include <dev/serial-line.h>
 #include <init.h>
-#include "shell/shell.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <avr/pgmspace.h>
 
+#include "shell/shell.h"
 
 /*---------------------------------------------------------------------------*/
 PROCESS(serial_shell_process, "Contiki serial shell");
 INIT_PROCESS(serial_shell_process);
 /*---------------------------------------------------------------------------*/
-void
-shell_default_output(const char *text1, int len1, const char *text2, int len2)
-{
+void shell_default_output(PGM_P fmt, va_list args) {
 	printf_P(PSTR("\r\x1b[2K"));
-	if (text1 != NULL) {
-		printf_P(PSTR("%s"), text1);
-	}
-	if (text2 != NULL) {
-		printf_P(PSTR("%s"), text2);
-	}
+	vfprintf_P(stdout, fmt, args);
 	printf_P(PSTR("\n"));
 }
 /*---------------------------------------------------------------------------*/

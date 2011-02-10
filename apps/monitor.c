@@ -22,6 +22,10 @@
 #include <init.h>
 #include "monitor.h"
 
+#include <stdio.h>
+#include <avr/pgmspace.h>
+#include <sys/stimer.h>
+
 #include "network.h"
 #if CONFIG_APPS_DHCP
 #include "dhcp.h"
@@ -30,10 +34,6 @@
 #include "timesync.h"
 
 #include "drivers/wallclock.h"
-
-#include <stdio.h>
-#include <avr/pgmspace.h>
-#include <sys/stimer.h>
 
 PROCESS(monitor_process, "Monitor");
 INIT_PROCESS(monitor_process);

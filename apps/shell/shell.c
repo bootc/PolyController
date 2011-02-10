@@ -48,11 +48,12 @@
 
 #include "net/rime.h"
 
-#include "shell.h"
-
+#include <alloca.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdio.h>
+
+#include "shell.h"
 
 LIST(commands);
 
@@ -358,17 +359,27 @@ shell_input(char *commandline, int commandline_len)
 /*---------------------------------------------------------------------------*/
 void shell_output_P(struct shell_command * c, PGM_P fmt, ...) {
 	va_list argp;
-	char buf[80];
-	uint16_t len;
 
-	va_start(argp, fmt);
-	len = vsnprintf_P(buf, sizeof(buf), fmt, argp);
-	va_end(argp);
+	// Skip empty format strings
+	if ((fmt == NULL) || (strlen_P(fmt) == 0)) {
+		return;
+	}
 
 	if (c != NULL && c->child != NULL) {
+		// This next bit is unusual, so we use alloca to put stuff on the stack
+		char *buf = alloca(80);
+		uint16_t len;
+
+		va_start(argp, fmt);
+		len = vsnprintf_P(buf, 80, fmt, argp);
+		va_end(argp);
+
 		input_to_child_command(c->child, buf, len, "", 0);
-	} else {
-		shell_default_output(buf, len, "", 0);
+	}
+	else {
+		va_start(argp, fmt);
+		shell_default_output(fmt, argp);
+		va_end(argp);
 	}
 }
 /*---------------------------------------------------------------------------*/

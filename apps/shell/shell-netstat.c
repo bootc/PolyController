@@ -89,8 +89,6 @@ static const char *states[] PROGMEM = {
 	running,
 	called};
 
-#define BUFLEN 100
-
 /*---------------------------------------------------------------------------*/
 PROCESS(shell_netstat_process, "netstat");
 SHELL_COMMAND(netstat_command,
