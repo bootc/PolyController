@@ -231,6 +231,14 @@ LICENSE:
   #define UART1_CONTROL  UCSR1B
   #define UART1_DATA     UDR1
   #define UART1_UDRIE    UDRIE1
+#elif defined(__AVR_ATmega32U4__)
+  #define ATMEGA_USART_USB
+  #define UART0_RECEIVE_INTERRUPT   USART1_RX_vect
+  #define UART0_TRANSMIT_INTERRUPT  USART1_UDRE_vect
+  #define UART0_STATUS   UCSR1A
+  #define UART0_CONTROL  UCSR1B
+  #define UART0_DATA     UDR1
+  #define UART0_UDRIE    UDRIE1
 #else
  #error "no UART definition for MCU available"
 #endif
@@ -284,6 +292,8 @@ Purpose:  called when the UART has received a character
     lastRxError = (usr & (_BV(FE0)|_BV(DOR0)) );
 #elif defined ( ATMEGA_UART )
     lastRxError = (usr & (_BV(FE)|_BV(DOR)) );
+#elif defined( ATMEGA_USART_USB )
+    lastRxError = (usr & (_BV(FE1)|_BV(DOR1)) );
 #endif
 
     /* calculate buffer index */
@@ -396,6 +406,26 @@ void uart_init(unsigned int baudrate)
 
     /* Enable UART receiver and transmitter and receive complete interrupt */
     UART0_CONTROL = _BV(RXCIE)|(1<<RXEN)|(1<<TXEN);
+
+#elif defined (ATMEGA_USART_USB )
+    /* Set baud rate */
+    if ( baudrate & 0x8000 )
+    {
+   		UART0_STATUS = (1<<U2X1);  //Enable 2x speed
+   		baudrate &= ~0x8000;
+   	}
+    UBRR1H = (unsigned char)(baudrate>>8);
+    UBRR1L = (unsigned char) baudrate;
+
+    /* Enable USART receiver and transmitter and receive complete interrupt */
+    UART0_CONTROL = _BV(RXCIE1)|(1<<RXEN1)|(1<<TXEN1);
+
+    /* Set frame format: asynchronous, 8data, no parity, 1stop bit */
+    #ifdef URSEL1
+    UCSR1C = (1<<URSEL1)|(3<<UCSZ01);
+    #else
+    UCSR1C = (3<<UCSZ10);
+    #endif
 
 #endif
 
