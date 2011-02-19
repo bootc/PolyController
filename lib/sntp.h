@@ -52,6 +52,11 @@ MODIFICATION DETAILS
 // number of retries
 #define UIP_SNTP_RETRIES 10
 
+// epoch conversion functions
+#define NTP_TO_UNIX_OFFSET 2208988800UL
+#define NTP_TO_UNIX(time) ((time) - NTP_TO_UNIX_OFFSET)
+#define UNIX_TO_NTP(time) ((time) + NTP_TO_UNIX_OFFSET)
+
 /*
    SNTP message structure
    refer RFC-1305 for detail

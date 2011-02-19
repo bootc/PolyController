@@ -19,7 +19,6 @@
  */
 
 #include <contiki-net.h>
-#include <sys/log.h>
 
 #include <stdio.h>
 #include <avr/pgmspace.h>

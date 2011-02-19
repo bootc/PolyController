@@ -121,23 +121,17 @@ PROCESS_THREAD(shell_netstat_process, ev, data)
 	}
 
 	for (i = 0; i < UIP_UDP_CONNS; i++) {
-		struct uip_udp_conn *conn = &uip_udp_conns[i];
+		struct uip_udp_conn *udp = &uip_udp_conns[i];
 		shell_output_P(&netstat_command,
 			PSTR("UDP %u, %u.%u.%u.%u:%u"),
-			uip_htons(conn->lport),
-			conn->ripaddr.u8[0],
-			conn->ripaddr.u8[1],
-			conn->ripaddr.u8[2],
-			conn->ripaddr.u8[3],
-			uip_htons(conn->rport));
+			uip_htons(udp->lport),
+			udp->ripaddr.u8[0],
+			udp->ripaddr.u8[1],
+			udp->ripaddr.u8[2],
+			udp->ripaddr.u8[3],
+			uip_htons(udp->rport));
 	}
 
 	PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
-	void
-shell_netstat_init(void)
-{
-	shell_register_command(&netstat_command);
-}
-/*---------------------------------------------------------------------------*/
+

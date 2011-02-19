@@ -134,22 +134,6 @@ static void enc424j600SendSystemReset(void) {
 	_delay_us(1000);
 }
 
-/**
- * Is link connected?
- * @return <bool>
- */
-uint8_t enc424j600MACIsLinked(void) {
-	return (enc424j600ReadReg(ESTAT) & ESTAT_PHYLNK) != 0u;
-}
-
-/**
- * Is transmission active?
- * @return <bool>
- */
-uint8_t enc424j600MACIsTxReady(void) {
-	return !(enc424j600ReadReg(ECON1) & ECON1_TXRTS);
-}
-
 /********************************************************************
  * PACKET TRANSMISSION
  * ******************************************************************/

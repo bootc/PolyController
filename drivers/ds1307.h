@@ -21,7 +21,7 @@
 #ifndef DS1307_H
 #define DS1307_H
 
-#include <rtc.h>
+#include <time.h>
 
 /**
  * Driver for DS1307 RTC chip.
@@ -50,8 +50,8 @@
 int ds1307_clock_start(void);
 int ds1307_clock_stop(void);
 
-int ds1307_clock_set(const struct rtc_time * const tm);
-int ds1307_clock_get(struct rtc_time *tm);
+int ds1307_clock_set(const struct tm * const tm);
+int ds1307_clock_get(struct tm *tm);
 
 int ds1307_ctl_set(uint8_t ctl);
 int ds1307_ctl_get(uint8_t *ctl);

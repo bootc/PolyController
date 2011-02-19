@@ -1,0 +1,5 @@
+file SIMAVR-FIRMWARE.elf
+target remote localhost:1234
+load
+break main
+continue

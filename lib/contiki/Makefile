@@ -15,7 +15,7 @@ CONTIKI_SYSTEM := \
 	timer.c etimer.c ctimer.c energest.c rtimer.c stimer.c
 CONTIKI_LIBS := \
 	memb.c mmem.c list.c \
-	print-stats.c ifft.c crc16.c random.c checkpoint.c ringbuf.c
+	print-stats.c ifft.c random.c checkpoint.c ringbuf.c
 CONTIKI_AVR := \
 	mtarch.c
 CONTIKI_DEV := \

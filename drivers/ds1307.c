@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <avr/io.h>
+#include <time.h>
 
 #include "ds1307.h"
 #include "i2c.h"
@@ -192,18 +193,18 @@ int ds1307_clock_stop(void) {
 	return 0;
 }
 
-int ds1307_clock_set(const struct rtc_time * const tm) {
+int ds1307_clock_set(const struct tm * const tm) {
 	int ret;
 	struct ds1307_raw raw;
 
 	// Sanity check
-	ret = rtc_valid_tm(tm);
+	ret = tm_valid(tm);
 	if (ret) {
 		return -1;
 	}
 
 	// We also check the year 2000 <= x < 2100
-	if (tm->year < 100 || tm->year >= 200) {
+	if (tm->tm_year < 100 || tm->tm_year >= 200) {
 		return -1;
 	}
 
@@ -214,13 +215,13 @@ int ds1307_clock_set(const struct rtc_time * const tm) {
 	}
 
 	// Update the values, keeping the CH bit intact
-	raw.sec = dec2bcd(tm->sec);
-	raw.min = dec2bcd(tm->min);
-	raw.hour = dec2bcd(tm->hour);
-	raw.wday = dec2bcd(tm->wday + 1);
-	raw.mday = dec2bcd(tm->mday);
-	raw.mon = dec2bcd(tm->mon + 1);
-	raw.year = dec2bcd(tm->year % 100);
+	raw.sec = dec2bcd(tm->tm_sec);
+	raw.min = dec2bcd(tm->tm_min);
+	raw.hour = dec2bcd(tm->tm_hour);
+	raw.wday = dec2bcd(tm->tm_wday + 1);
+	raw.mday = dec2bcd(tm->tm_mday);
+	raw.mon = dec2bcd(tm->tm_mon + 1);
+	raw.year = dec2bcd(tm->tm_year % 100);
 
 	// Write the values back
 	ret = write((uint8_t *)&raw, ADDR_SEC, sizeof(raw));
@@ -231,7 +232,7 @@ int ds1307_clock_set(const struct rtc_time * const tm) {
 	return 0;	
 }
 
-int ds1307_clock_get(struct rtc_time *tm) {
+int ds1307_clock_get(struct tm *tm) {
 	int ret;
 	struct ds1307_raw raw;
 
@@ -242,29 +243,29 @@ int ds1307_clock_get(struct rtc_time *tm) {
 	}
 
 	// Convert the values
-	tm->sec = bcd2dec(raw.sec);
-	tm->min = bcd2dec(raw.min);
+	tm->tm_sec = bcd2dec(raw.sec);
+	tm->tm_min = bcd2dec(raw.min);
 	// hour is done below
-	tm->mday = bcd2dec(raw.mday);
-	tm->mon = bcd2dec(raw.mon - 1);
-	tm->year = bcd2dec(raw.year + 100); // we assume a century of 2000
-	tm->wday = bcd2dec(raw.wday - 1);
+	tm->tm_mday = bcd2dec(raw.mday);
+	tm->tm_mon = bcd2dec(raw.mon - 1);
+	tm->tm_year = bcd2dec(raw.year + 100); // we assume a century of 2000
+	tm->tm_wday = bcd2dec(raw.wday - 1);
 
 	// Convert hours, taking into account 12-hour mode
 	if (raw.hour & HOUR_12) {
 		if (raw.hour & HOUR_PM) {
 			// 1 - 12 pm is 13 - 00
-			tm->hour = bcd2dec(raw.hour & ~(HOUR_12 | HOUR_PM));
-			tm->hour += 12;
-			tm->hour %= 24;
+			tm->tm_hour = bcd2dec(raw.hour & ~(HOUR_12 | HOUR_PM));
+			tm->tm_hour += 12;
+			tm->tm_hour %= 24;
 		}
 		else {
 			// 1 - 12 am is 01 - 12
-			tm->hour = bcd2dec(raw.hour & ~HOUR_12);
+			tm->tm_hour = bcd2dec(raw.hour & ~HOUR_12);
 		}
 	}
 	else {
-		tm->hour = bcd2dec(raw.hour);
+		tm->tm_hour = bcd2dec(raw.hour);
 	}
 
 	return 0;

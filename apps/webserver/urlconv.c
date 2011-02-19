@@ -37,6 +37,7 @@
 
 #include "cfs/cfs.h"
 #include "http-strings.h"
+#include "urlconv.h"
 
 #define ISO_number   0x23
 #define ISO_percent  0x25

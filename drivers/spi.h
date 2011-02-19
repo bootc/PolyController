@@ -25,6 +25,7 @@
 
 void spi_init(void);
 void spi_release(void);
+inline uint8_t spi_rw(uint8_t out);
 
 inline uint8_t spi_rw(uint8_t out) {
 	uint8_t in;

@@ -570,16 +570,16 @@ static int ow_touch_byte(uint8_t sendbyte) {
 
 int ow_presence(ow_addr_t addr) {
 	int res;
-	ow_search_t s;
+	ow_search_t se;
 
-	s.last_discrepancy = 64;
-	s.last_device_flag = 0;
-	memcpy(s.rom_no, addr, sizeof(addr));
+	se.last_discrepancy = 64;
+	se.last_device_flag = 0;
+	memcpy(se.rom_no, addr, sizeof(addr));
 
-	res = ow_search(&s);
+	res = ow_search(&se);
 	if (res == 1) {
 		// check if same device found
-		if (memcmp(s.rom_no, addr, sizeof(addr)) != 0) {
+		if (memcmp(se.rom_no, addr, sizeof(addr)) != 0) {
 			res = 0;
 		}
 	}
@@ -588,48 +588,48 @@ int ow_presence(ow_addr_t addr) {
 	return res;
 }
 
-int ow_search_first(ow_search_t *s) {
+int ow_search_first(ow_search_t *se) {
 	// reset the search state
-	s->last_discrepancy = 0;
-	s->last_device_flag = 0;
-	s->last_family_discrepancy = 0;
+	se->last_discrepancy = 0;
+	se->last_device_flag = 0;
+	se->last_family_discrepancy = 0;
 
-	return ow_search(s);
+	return ow_search(se);
 }
 
-int ow_search_next(ow_search_t *s) {
+int ow_search_next(ow_search_t *se) {
 	// leave the search state alone
-	return ow_search(s);
+	return ow_search(se);
 }
 
-int ow_search_target(ow_search_t *s, uint8_t family) {
-	memset(s->rom_no, 0, sizeof(s->rom_no));
-	s->last_discrepancy = 64;
-	s->last_family_discrepancy = 0;
-	s->last_device_flag = 0;
+int ow_search_target(ow_search_t *se, uint8_t family) {
+	memset(se->rom_no, 0, sizeof(se->rom_no));
+	se->last_discrepancy = 64;
+	se->last_family_discrepancy = 0;
+	se->last_device_flag = 0;
 
 	// set the search state to find SearchFamily type devices
-	s->rom_no[0] = family;
+	se->rom_no[0] = family;
 
-	return ow_search(s);
+	return ow_search(se);
 }
 
-int ow_search_skip_family(ow_search_t *s) {
+int ow_search_skip_family(ow_search_t *se) {
 	// set the Last discrepancy to last family discrepancy
-	s->last_discrepancy = s->last_family_discrepancy;
+	se->last_discrepancy = se->last_family_discrepancy;
 
 	// clear the last family discrpepancy
-	s->last_family_discrepancy = 0;
+	se->last_family_discrepancy = 0;
 
 	// check for end of list
-	if (s->last_discrepancy == 0) {
-		s->last_device_flag = 1;
+	if (se->last_discrepancy == 0) {
+		se->last_device_flag = 1;
 	}
 
-	return ow_search(s);
+	return ow_search(se);
 }
 
-static int ow_search(ow_search_t *s) {
+static int ow_search(ow_search_t *se) {
 	int ret;
 	int id_bit_number;
 	int last_zero, rom_byte_number, search_result;
@@ -642,10 +642,10 @@ static int ow_search(ow_search_t *s) {
 	rom_byte_number = 0;
 	rom_byte_mask = 1;
 	search_result = 0;
-	s->crc = 0;
+	se->crc = 0;
 
 	// if the last call was not the last one
-	if (!s->last_device_flag) {
+	if (!se->last_device_flag) {
 		// 1-Wire reset
 		ret = ow_reset();
 		if (ret < 0) {
@@ -653,9 +653,9 @@ static int ow_search(ow_search_t *s) {
 		}
 		else if (ret == 0) {
 			// reset the search
-			s->last_discrepancy = 0;
-			s->last_device_flag = 0;
-			s->last_family_discrepancy = 0;
+			se->last_discrepancy = 0;
+			se->last_device_flag = 0;
+			se->last_family_discrepancy = 0;
 			return 0;
 		}
 
@@ -669,15 +669,15 @@ static int ow_search(ow_search_t *s) {
 		do {
 			// if this discrepancy if before the Last Discrepancy
 			// on a previous next then pick the same as last time
-			if (id_bit_number < s->last_discrepancy) {
-				if ((s->rom_no[rom_byte_number] & rom_byte_mask) > 0)
+			if (id_bit_number < se->last_discrepancy) {
+				if ((se->rom_no[rom_byte_number] & rom_byte_mask) > 0)
 					search_direction = 1;
 				else
 					search_direction = 0;
 			}
 			else {
 				// if equal to last pick 1, if not then pick 0
-				if (id_bit_number == s->last_discrepancy)
+				if (id_bit_number == se->last_discrepancy)
 					search_direction = 1;
 				else
 					search_direction = 0;
@@ -705,17 +705,17 @@ static int ow_search(ow_search_t *s) {
 
 					// check for Last discrepancy in family
 					if (last_zero < 9) {
-						s->last_family_discrepancy = last_zero;
+						se->last_family_discrepancy = last_zero;
 					}
 				}
 
 				// set or clear the bit in the ROM byte rom_byte_number
 				// with mask rom_byte_mask
 				if (search_direction == 1) {
-					s->rom_no[rom_byte_number] |= rom_byte_mask;
+					se->rom_no[rom_byte_number] |= rom_byte_mask;
 				}
 				else {
-					s->rom_no[rom_byte_number] &= (uint8_t)~rom_byte_mask;
+					se->rom_no[rom_byte_number] &= (uint8_t)~rom_byte_mask;
 				}
 
 				// increment the byte counter id_bit_number
@@ -727,8 +727,8 @@ static int ow_search(ow_search_t *s) {
 				// rom_byte_number and reset mask
 				if (rom_byte_mask == 0) {
 					// accumulate the CRC
-					s->crc = _crc_ibutton_update(s->crc,
-						s->rom_no[rom_byte_number]);
+					se->crc = _crc_ibutton_update(se->crc,
+						se->rom_no[rom_byte_number]);
 					rom_byte_number++;
 					rom_byte_mask = 1;
 				}
@@ -737,14 +737,14 @@ static int ow_search(ow_search_t *s) {
 		while (rom_byte_number < 8);  // loop until through all ROM bytes 0-7
 
 		// if the search was successful then
-		if (!((id_bit_number < 65) || (s->crc != 0))) {
+		if (!((id_bit_number < 65) || (se->crc != 0))) {
 			// search successful so set s->last_discrepancy,s->last_device_flag
 			// search_result
-			s->last_discrepancy = last_zero;
+			se->last_discrepancy = last_zero;
 
 			// check for last device
-			if (s->last_discrepancy == 0) {
-				s->last_device_flag = 1;
+			if (se->last_discrepancy == 0) {
+				se->last_device_flag = 1;
 			}
 
 			search_result = 1;
@@ -753,10 +753,10 @@ static int ow_search(ow_search_t *s) {
 
 	// if no device found then reset counters so next
 	// 'search' will be like a first
-	if (!search_result || (s->rom_no[0] == 0)) {
-		s->last_discrepancy = 0;
-		s->last_device_flag = 0;
-		s->last_family_discrepancy = 0;
+	if (!search_result || (se->rom_no[0] == 0)) {
+		se->last_discrepancy = 0;
+		se->last_device_flag = 0;
+		se->last_family_discrepancy = 0;
 		search_result = 0;
 	}
 

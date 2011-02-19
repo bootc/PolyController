@@ -18,42 +18,15 @@
  * MA 02110-1301, USA.
  */
 
-#include <contiki-net.h>
-#include <sys/log.h>
+#ifndef STRFTIME_H
+#define STRFTIME_H
 
-#include <stdio.h>
-#include <avr/pgmspace.h>
+int strftime(char *s, size_t size,
+	const char *fmt,
+	const struct rtc_time *tm);
 
-#include <init.h>
-#include <board.h>
+int strftime_P(char *s, size_t size,
+	PGM_P fmt,
+	const struct rtc_time *tm);
 
-int main(void) {
-	// Basic board init
-	board_init();
-
-	// Start the main clock
-	clock_init();
-
-	// Enable interrupts
-	sei();
-
-	// Initialise everything else
-	init_doinit();
-
-	while (1) {
-		// Run processes
-		process_run();
-	}
-
-	return 0;
-}
-
-INIT_LIBRARY(process, process_init);
-INIT_PROCESS(etimer_process);
-
-#if LOG_CONF_ENABLED
-void log_message(const char *part1, const char *part2) {
-	printf_P(PSTR("%s%s\n"), part1 ? part1 : "", part2 ? part2 : "");
-}
-#endif
-
+#endif // STRFTIME_H

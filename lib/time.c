@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <avr/pgmspace.h>
 
-#include "rtc.h"
+#include <time.h>
 
 /*
  * All of the code here has been cribbed from the Linux kernel. There have been
@@ -45,6 +45,47 @@ static inline uint8_t rtc_month_days(uint8_t month, uint16_t year) {
 }
 
 /*
+ * Convert seconds since 01-01-1970 00:00:00 to Gregorian date.
+ */
+struct tm *gmtime(time_t time, struct tm *tm) {
+	uint16_t year;
+	uint8_t month;
+	int32_t days;
+
+	days = time / 86400;
+	time %= 86400;
+
+	/* day of the week, 1970-01-01 was a Thursday */
+	tm->tm_wday = (days + 4) % 7;
+
+	year = 1970 + days / 365;
+	days -= (year - 1970) * 365
+		+ LEAPS_THRU_END_OF(year - 1)
+		- LEAPS_THRU_END_OF(1970 - 1);
+	if (days < 0) {
+		year -= 1;
+		days += 365 + is_leap_year(year);
+	}
+	tm->tm_year = year - 1900;
+
+	for (month = 0; month < 11; month++) {
+		int32_t newdays = days - rtc_month_days(month, year);
+		if (newdays < 0)
+			break;
+		days = newdays;
+	}
+	tm->tm_mon = month;
+	tm->tm_mday = days + 1;
+
+	tm->tm_hour = time / 3600;
+	time %= 3600;
+	tm->tm_min = time / 60;
+	tm->tm_sec = time % 60;
+
+	return tm;
+}
+
+/*
  * Converts Gregorian date to seconds since 1970-01-01 00:00:00.
  * Assumes input in normal date format, i.e. 1980-12-31 23:59:59
  * => year=1980, mon=12, day=31, hour=23, min=59, sec=59.
@@ -60,85 +101,35 @@ static inline uint8_t rtc_month_days(uint8_t month, uint16_t year) {
  * machines where long is 32-bit! (However, as time_t is signed, we
  * will already get problems at other places on 2038-01-19 03:14:08)
  */
-time_t mktime(
-	const uint16_t year0, const uint8_t mon0,
-	const uint8_t day, const uint8_t hour,
-	const uint8_t min, const uint8_t sec)
-{
-	uint8_t mon = mon0;
-	uint16_t year = year0;
+time_t mktime(const struct tm * const tm) {
+	unsigned int mon = tm->tm_mon + 1;
+	unsigned long year = tm->tm_year + 1900;
 
 	/* 1..12 -> 11,12,1..10 */
-	if (0 >= (int8_t) (mon -= 2)) {
+	if (0 >= (int) (mon -= 2)) {
 		mon += 12;	/* Puts Feb last since it has leap day */
 		year -= 1;
 	}
 
-	return ((((uint32_t)
-		(year/4 - year/100 + year/400 + 367*mon/12 + day) +
+	return ((((time_t)
+		(year/4 - year/100 + year/400 + 367*mon/12 + tm->tm_mday) +
 		year*365 - 719499
-		)*24 + hour /* now have hours */
-		)*60 + min /* now have minutes */
-		)*60 + sec; /* finally seconds */
+		)*24 + tm->tm_hour /* now have hours */
+		)*60 + tm->tm_min /* now have minutes */
+		)*60 + tm->tm_sec; /* finally seconds */
 }
 
-/*
- * Convert seconds since 01-01-1970 00:00:00 to Gregorian date.
- */
-void rtc_time_to_tm(time_t time, struct rtc_time *tm) {
-	uint16_t year;
-	uint8_t month;
-	int32_t days;
-
-	days = time / 86400;
-	time %= 86400;
-
-	/* day of the week, 1970-01-01 was a Thursday */
-	tm->wday = (days + 4) % 7;
-
-	year = 1970 + days / 365;
-	days -= (year - 1970) * 365
-		+ LEAPS_THRU_END_OF(year - 1)
-		- LEAPS_THRU_END_OF(1970 - 1);
-	if (days < 0) {
-		year -= 1;
-		days += 365 + is_leap_year(year);
-	}
-	tm->year = year - 1900;
-
-	for (month = 0; month < 11; month++) {
-		int32_t newdays = days - rtc_month_days(month, year);
-		if (newdays < 0)
-			break;
-		days = newdays;
-	}
-	tm->mon = month;
-	tm->mday = days + 1;
-
-	tm->hour = time / 3600;
-	time %= 3600;
-	tm->min = time / 60;
-	tm->sec = time % 60;
-}
-
-/*
- * Convert Gregorian date to seconds since 01-01-1970 00:00:00.
- */
-time_t rtc_tm_to_time(const struct rtc_time *tm) {
-	return mktime(tm->year + 1900, tm->mon + 1, tm->mday,
-		tm->hour, tm->min, tm->sec);
-}
 
 /*
  * Does the rtc_time represent a valid date/time?
  */
-int rtc_valid_tm(const struct rtc_time *tm) {
-	if (tm->mon >= 12
-		|| tm->mday < 1
-		|| tm->mday > rtc_month_days(tm->mon, tm->year)
-		|| tm->hour >= 24
-		|| tm->min >= 60
-		|| tm->sec >= 60)
+int tm_valid(const struct tm *tm) {
+	if (tm->tm_mon >= 12
+		|| tm->tm_mday < 1
+		|| tm->tm_mday > rtc_month_days(tm->tm_mon, tm->tm_year)
+		|| tm->tm_hour >= 24
+		|| tm->tm_min >= 60
+		|| tm->tm_sec > 60)
 	{
 		return -1;
 	}

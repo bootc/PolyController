@@ -24,11 +24,11 @@
 #include <init.h>
 #include "timesync.h"
 
+#include <time.h>
+#include <sntp.h>
+#include "dhcp.h"
 #include "drivers/ds1307.h"
 #include "drivers/wallclock.h"
-#include "lib/sntp.h"
-#include "lib/rtc.h"
-#include "dhcp.h"
 
 #include <stdio.h>
 #include <avr/pgmspace.h>
@@ -46,7 +46,7 @@ static struct stimer tmr_resync;
 
 static int init(void) {
 	int err;
-	struct rtc_time tm;
+	struct tm tm;
 	wallclock_time_t new;
 
 	timesync_event = process_alloc_event();
@@ -67,7 +67,7 @@ static int init(void) {
 	}
 
 	// Set up the new time
-	new.sec = rtc_tm_to_time(&tm);
+	new.sec = mktime(&tm);
 	new.frac = 0x7ff; // mid-way through second
 
 	// Set the system time from the RTC
@@ -147,7 +147,7 @@ PROCESS_THREAD(timesync_process, ev, data) {
 
 int timesync_set_time(const wallclock_time_t *time) {
 	int err;
-	struct rtc_time tm;
+	struct tm tm;
 	uint32_t cur;
 
 	// First, update the wallclock
@@ -162,11 +162,11 @@ int timesync_set_time(const wallclock_time_t *time) {
 		return err;
 	}
 
-	cur = rtc_tm_to_time(&tm);
+	cur = mktime(&tm);
 
 	// If the RTC is 3 or more seconds out, change the RTC
 	if (abs(time->sec - cur) >= 3) {
-		rtc_time_to_tm(time->sec, &tm);
+		gmtime(time->sec, &tm);
 
 		err = ds1307_clock_set(&tm);
 		if (err) {

@@ -18,42 +18,20 @@
  * MA 02110-1301, USA.
  */
 
-#include <contiki-net.h>
-#include <sys/log.h>
+#include <avr/io.h>
+#include "board.h"
 
-#include <stdio.h>
-#include <avr/pgmspace.h>
-
-#include <init.h>
-#include <board.h>
-
-int main(void) {
-	// Basic board init
-	board_init();
-
-	// Start the main clock
-	clock_init();
-
-	// Enable interrupts
-	sei();
-
-	// Initialise everything else
-	init_doinit();
-
-	while (1) {
-		// Run processes
-		process_run();
-	}
-
-	return 0;
-}
-
-INIT_LIBRARY(process, process_init);
-INIT_PROCESS(etimer_process);
-
-#if LOG_CONF_ENABLED
-void log_message(const char *part1, const char *part2) {
-	printf_P(PSTR("%s%s\n"), part1 ? part1 : "", part2 ? part2 : "");
-}
+#if F_CPU != 8000000
+#error "Funny old clock speed..."
 #endif
+
+// This gets called to set up the IO pins
+void board_init(void) {
+	// Twiddle ports for LEDs
+	DDRD = _BV(PIND6) | _BV(PIND7) | _BV(PIND3);
+	PORTD = _BV(PIND6) | _BV(PIND7);
+
+	DDRB = _BV(PINB6);
+	PORTB = _BV(PINB6);
+}
 
