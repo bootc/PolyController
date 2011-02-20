@@ -21,12 +21,8 @@
 #ifndef STRFTIME_H
 #define STRFTIME_H
 
-int strftime(char *s, size_t size,
-	const char *fmt,
-	const struct rtc_time *tm);
-
 int strftime_P(char *s, size_t size,
 	PGM_P fmt,
-	const struct rtc_time *tm);
+	const struct tm *tm);
 
 #endif // STRFTIME_H

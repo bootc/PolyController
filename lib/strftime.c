@@ -58,78 +58,63 @@
 	((TYPE_BIT(type) - TYPE_SIGNED(type)) * 302 / 1000 + \
 	 1 + TYPE_SIGNED(type))
 
-struct lc_time_T {
-	const char *mon[MONSPERYEAR];
-	const char *month[MONSPERYEAR];
-	const char *wday[DAYSPERWEEK];
-	const char *weekday[DAYSPERWEEK];
-	const char *X_fmt;
-	const char *x_fmt;
-	const char *c_fmt;
-	const char *am;
-	const char *pm;
-	const char *date_fmt;
-};
 
-#define Locale	(&C_time_locale)
+const char mon[] PROGMEM =
+	"Jan\0" "Feb\0" "Mar\0" "Apr\0" "May\0" "Jun\0"
+	"Jul\0" "Aug\0" "Sep\0" "Oct\0" "Nov\0" "Dec";
 
-static const struct lc_time_T C_time_locale = {
-	{
-		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-	}, {
-		"January", "February", "March", "April", "May", "June",
-		"July", "August", "September", "October", "November", "December"
-	}, {
-		"Sun", "Mon", "Tue", "Wed",
-		"Thu", "Fri", "Sat"
-	}, {
-		"Sunday", "Monday", "Tuesday", "Wednesday",
-		"Thursday", "Friday", "Saturday"
-	},
+const char month[] PROGMEM =
+	"January\0" "February\0" "March\0" "April\0" "May\0" "June\0"
+	"July\0" "August\0" "September\0" "October\0" "November\0" "December";
 
-	/* X_fmt */
-	"%H:%M:%S",
+const char wday[] PROGMEM =
+	"Sun\0" "Mon\0" "Tue\0" "Wed\0"
+	"Thu\0" "Fri\0" "Sat";
 
-	/*
-	 ** x_fmt
-	 ** C99 requires this format.
-	 ** Using just numbers (as here) makes Quakers happier;
-	 ** it's also compatible with SVR4.
-	 */
-	"%m/%d/%y",
+const char weekday[] PROGMEM =
+	"Sunday\0" "Monday\0" "Tuesday\0" "Wednesday\0"
+	"Thursday\0" "Friday\0" "Saturday\0";
 
-	/*
-	 ** c_fmt
-	 ** C99 requires this format.
-	 ** Previously this code used "%D %X", but we now conform to C99.
-	 ** Note that
-	 ** "%a %b %d %H:%M:%S %Y"
-	 ** is used by Solaris 2.3.
-	 */
-	"%a %b %e %T %Y",
+const char X_fmt[] PROGMEM = "%H:%M:%S";
 
-	/* am */
-	"AM",
+/*
+ ** C99 requires this format.
+ ** Using just numbers (as here) makes Quakers happier;
+ ** it's also compatible with SVR4.
+ */
+const char x_fmt[] PROGMEM = "%m/%d/%y";
 
-	/* pm */
-	"PM",
+/*
+ ** C99 requires this format.
+ ** Previously this code used "%D %X", but we now conform to C99.
+ ** Note that
+ ** "%a %b %d %H:%M:%S %Y"
+ ** is used by Solaris 2.3.
+ */
+const char c_fmt[] PROGMEM = "%a %b %e %T %Y";
 
-	/* date_fmt */
-	"%a %b %e %H:%M:%S %Z %Y"
-};
+/* am */
+const char am[] PROGMEM = "AM";
 
-static char *_add(const char *, char *, const char *);
+/* pm */
+const char pm[] PROGMEM = "PM";
+
+/* date_fmt */
+const char date_fmt[] PROGMEM = "%a %b %e %H:%M:%S %Z %Y";
+
+static char *_add_P(PGM_P, char *, const char *);
 static char *_conv(int, PGM_P fmt, char *, const char *);
-static char *_fmt(const char *, const struct tm *, char *, const char *);
+static char *_fmt(PGM_P, const struct tm *, char *, const char *);
 static char *_yconv(int, int, int, int, char *, const char *);
 
-size_t strftime(char *const s, const size_t maxsize,
-	const char *const format, const struct tm *const t)
+static PGM_P _idx(PGM_P arr, int idx);
+
+size_t strftime_P(char *const s, const size_t maxsize,
+	PGM_P format, const struct tm *const t)
 {
 	char *p;
 
-	p = _fmt(((format == NULL) ? "%c" : format), t, s, s + maxsize);
+	p = _fmt(((format == NULL) ? c_fmt : format), t, s, s + maxsize);
 
 	if (p == s + maxsize)
 		return 0;
@@ -138,39 +123,39 @@ size_t strftime(char *const s, const size_t maxsize,
 	return (size_t) (p - s);
 }
 
-static char *_fmt(const char *format, const struct tm *const t,
+static char *_fmt(PGM_P format, const struct tm *const t,
 	char *pt, const char *const ptlim)
 {
-	for (; *format; ++format) {
-		if (*format == '%') {
+	for (; pgm_read_byte(format); ++format) {
+		if (pgm_read_byte(format) == '%') {
 label:;
-			char f = *++format;
+			char f = pgm_read_byte(++format);
 
 			if (f == '\0') {
 				--format;
 			}
 			else if (f == 'A') {
-				pt = _add((t->tm_wday < 0 ||
-							t->tm_wday >= DAYSPERWEEK) ?
-						"?" : Locale->weekday[t->tm_wday], pt, ptlim);
+				pt = _add_P(
+					(t->tm_wday < 0 || t->tm_wday >= DAYSPERWEEK) ?
+					PSTR("?") : _idx(weekday, t->tm_wday), pt, ptlim);
 				continue;
 			}
 			else if (f == 'a') {
-				pt = _add((t->tm_wday < 0 ||
-							t->tm_wday >= DAYSPERWEEK) ?
-						"?" : Locale->wday[t->tm_wday], pt, ptlim);
+				pt = _add_P(
+					(t->tm_wday < 0 || t->tm_wday >= DAYSPERWEEK) ?
+					PSTR("?") : _idx(wday, t->tm_wday), pt, ptlim);
 				continue;
 			}
 			else if (f == 'B') {
-				pt = _add((t->tm_mon < 0 ||
-							t->tm_mon >= MONSPERYEAR) ?
-						"?" : Locale->month[t->tm_mon], pt, ptlim);
+				pt = _add_P(
+					(t->tm_mon < 0 || t->tm_mon >= MONSPERYEAR) ?
+					PSTR("?") : _idx(month, t->tm_mon), pt, ptlim);
 				continue;
 			}
 			else if (f == 'b' || f == 'h') {
-				pt = _add((t->tm_mon < 0 ||
-							t->tm_mon >= MONSPERYEAR) ?
-						"?" : Locale->mon[t->tm_mon], pt, ptlim);
+				pt = _add_P(
+					(t->tm_mon < 0 || t->tm_mon >= MONSPERYEAR) ?
+					PSTR("?") : _idx(mon, t->tm_mon), pt, ptlim);
 				continue;
 			}
 			else if (f == 'C') {
@@ -185,11 +170,11 @@ label:;
 				continue;
 			}
 			else if (f =='c') {
-				pt = _fmt(Locale->c_fmt, t, pt, ptlim);
+				pt = _fmt(c_fmt, t, pt, ptlim);
 				continue;
 			}
 			else if (f == 'D') {
-				pt = _fmt("%m/%d/%y", t, pt, ptlim);
+				pt = _fmt(PSTR("%m/%d/%y"), t, pt, ptlim);
 				continue;
 			}
 			else if (f == 'd') {
@@ -213,7 +198,7 @@ label:;
 				continue;
 			}
 			else if (f == 'F') {
-				pt = _fmt("%Y-%m-%d", t, pt, ptlim);
+				pt = _fmt(PSTR("%Y-%m-%d"), t, pt, ptlim);
 				continue;
 			}
 			else if (f == 'H') {
@@ -266,20 +251,20 @@ label:;
 				continue;
 			}
 			else if (f == 'n') {
-				pt = _add("\n", pt, ptlim);
+				pt = _add_P(PSTR("\n"), pt, ptlim);
 				continue;
 			}
 			else if (f == 'p') {
-				pt = _add((t->tm_hour >= (HOURSPERDAY / 2)) ?
-						Locale->pm : Locale->am, pt, ptlim);
+				pt = _add_P((t->tm_hour >= (HOURSPERDAY / 2)) ?
+						pm : am, pt, ptlim);
 				continue;
 			}
 			else if (f == 'R') {
-				pt = _fmt("%H:%M", t, pt, ptlim);
+				pt = _fmt(PSTR("%H:%M"), t, pt, ptlim);
 				continue;
 			}
 			else if (f == 'r') {
-				pt = _fmt("%I:%M:%S %p", t, pt, ptlim);
+				pt = _fmt(PSTR("%I:%M:%S %p"), t, pt, ptlim);
 				continue;
 			}
 			else if (f == 'S') {
@@ -308,11 +293,11 @@ label:;
 				continue;
 			}
 			else if (f == 'T') {
-				pt = _fmt("%H:%M:%S", t, pt, ptlim);
+				pt = _fmt(PSTR("%H:%M:%S"), t, pt, ptlim);
 				continue;
 			}
 			else if (f == 't') {
-				pt = _add("\t", pt, ptlim);
+				pt = _add_P(PSTR("\t"), pt, ptlim);
 				continue;
 			}
 			else if (f == 'U') {
@@ -397,10 +382,10 @@ label:;
 						DAYSPERLYEAR : DAYSPERNYEAR;
 				}
 
-				if (*format == 'V') {
+				if (f == 'V') {
 					pt = _conv(w, PSTR("%02d"), pt, ptlim);
 				}
-				else if (*format == 'g') {
+				else if (f == 'g') {
 					pt = _yconv(year, base, 0, 1, pt, ptlim);
 				}
 				else {
@@ -415,14 +400,15 @@ label:;
 				 ** "date as dd-bbb-YYYY"
 				 ** (ado, 1993-05-24)
 				 */
-				pt = _fmt("%e-%b-%Y", t, pt, ptlim);
+				pt = _fmt(PSTR("%e-%b-%Y"), t, pt, ptlim);
 				continue;
 			}
 			else if (f == 'W') {
-				pt = _conv((t->tm_yday + DAYSPERWEEK -
-							(t->tm_wday ? (t->tm_wday - 1) : (DAYSPERWEEK - 1)))
-						/ DAYSPERWEEK,
-						PSTR("%02d"), pt, ptlim);
+				pt = _conv(
+					(t->tm_yday + DAYSPERWEEK -
+						(t->tm_wday ? (t->tm_wday - 1) : (DAYSPERWEEK - 1))
+					) / DAYSPERWEEK,
+					PSTR("%02d"), pt, ptlim);
 				continue;
 			}
 			else if (f == 'w') {
@@ -430,11 +416,11 @@ label:;
 				continue;
 			}
 			else if (f == 'X') {
-				pt = _fmt(Locale->X_fmt, t, pt, ptlim);
+				pt = _fmt(X_fmt, t, pt, ptlim);
 				continue;
 			}
 			else if (f == 'x') {
-				pt = _fmt(Locale->x_fmt, t, pt, ptlim);
+				pt = _fmt(x_fmt, t, pt, ptlim);
 				continue;
 			}
 			else if (f == 'y') {
@@ -476,7 +462,7 @@ label:;
 				continue;
 			}
 			else if (f == '+') {
-				pt = _fmt(Locale->date_fmt, t, pt, ptlim);
+				pt = _fmt(date_fmt, t, pt, ptlim);
 				continue;
 			}
 			else if (f == '%') {
@@ -491,7 +477,7 @@ label:;
 		if (pt == ptlim)
 			break;
 
-		*pt++ = *format;
+		*pt++ = pgm_read_byte(format);
 	}
 
 	return pt;
@@ -511,12 +497,8 @@ static char *_conv(int n, PGM_P format, char * const pt,
 	}
 }
 
-static char *_add(str, pt, ptlim)
-	const char *str;
-	char *pt;
-	const char *const ptlim;
-{
-	while (pt < ptlim && (*pt = *str++) != '\0')
+static char *_add_P(PGM_P str, char *pt, const char *ptlim) {
+	while (pt < ptlim && (*pt = pgm_read_byte(str++)) != '\0')
 		++pt;
 	return pt;
 }
@@ -554,12 +536,20 @@ static char *_yconv(a, b, convert_top, convert_yy, pt, ptlim)
 	}
 	if (convert_top) {
 		if (lead == 0 && trail < 0)
-			pt = _add("-0", pt, ptlim);
+			pt = _add_P(PSTR("-0"), pt, ptlim);
 		else
 			pt = _conv(lead, PSTR("%02d"), pt, ptlim);
 	}
 	if (convert_yy)
 		pt = _conv(((trail < 0) ? -trail : trail), PSTR("%02d"), pt, ptlim);
 	return pt;
+}
+
+static PGM_P _idx(PGM_P arr, int idx) {
+	while (idx--) {
+		while (pgm_read_byte(arr++)) {
+		}
+	}
+	return arr;
 }
 
