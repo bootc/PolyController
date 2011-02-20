@@ -27,7 +27,9 @@
 #include <time.h>
 #include <sntp.h>
 #include "dhcp.h"
+#if CONFIG_DRIVERS_DS1307
 #include "drivers/ds1307.h"
+#endif
 #include "drivers/wallclock.h"
 
 #include <stdio.h>
@@ -45,21 +47,26 @@ static struct etimer tmr_periodic;
 static struct stimer tmr_resync;
 
 static int init(void) {
+#if CONFIG_DRIVERS_DS1307
 	int err;
 	struct tm tm;
 	wallclock_time_t new;
+#endif
 
 	timesync_event = process_alloc_event();
 	timesync_status.running = 0;
 	timesync_status.synchronised = 0;
 
+#if CONFIG_DRIVERS_DS1307
 	// Set up DS1307 RTC
 	ds1307_clock_start();
 	ds1307_ctl_set(DS1307_OUT_SQW_32768HZ);
+#endif
 
 	// Start the wallclock timer
 	wallclock_init();
 
+#if CONFIG_DRIVERS_DS1307
 	// Get the time from the RTC
 	err = ds1307_clock_get(&tm);
 	if (err) {
@@ -72,6 +79,7 @@ static int init(void) {
 
 	// Set the system time from the RTC
 	wallclock_set(&new);
+#endif
 
 	return 0;
 }
@@ -134,8 +142,10 @@ PROCESS_THREAD(timesync_process, ev, data) {
 			timesync_status.running = 0;
 			timesync_status.synchronised = 0;
 
+#if CONFIG_DRIVERS_DS1307
 			// Disable the DS1307 clock output to save power
 			ds1307_ctl_set(DS1307_OUT_LOW);
+#endif
 
 			process_exit(&timesync_process);
 			LOADER_UNLOAD();
@@ -146,9 +156,11 @@ PROCESS_THREAD(timesync_process, ev, data) {
 }
 
 int timesync_set_time(const wallclock_time_t *time) {
+#if CONFIG_DRIVERS_DS1307
 	int err;
 	struct tm tm;
 	uint32_t cur;
+#endif
 
 	// First, update the wallclock
 	wallclock_set(time);
@@ -156,6 +168,7 @@ int timesync_set_time(const wallclock_time_t *time) {
 	// Tell folks about the change
 	process_post(PROCESS_BROADCAST, timesync_event, &timesync_status);
 
+#if CONFIG_DRIVERS_DS1307
 	// Get the current RTC time
 	err = ds1307_clock_get(&tm);
 	if (err) {
@@ -173,6 +186,7 @@ int timesync_set_time(const wallclock_time_t *time) {
 			return err;
 		}
 	}
+#endif
 
 	return 0;
 }

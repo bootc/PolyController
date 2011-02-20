@@ -24,10 +24,12 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/atomic.h>
+#include "drivers/wallclock.h"
 
 static volatile clock_time_t count;
 static volatile uint16_t scount;
 static volatile uint32_t seconds;
+static uint32_t wallclock_delta;
 
 /*
  * CLOCK_SECOND is the number of ticks per second.
@@ -126,5 +128,22 @@ uint32_t clock_seconds(void) {
 	}
 
 	return tmp;
+}
+
+void wallclock_init(void) {}
+
+void wallclock_set(const wallclock_time_t * const time) {
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+		wallclock_delta = time->sec - seconds;
+	}
+}
+
+void wallclock_get(wallclock_time_t *time) {
+	time->sec = wallclock_seconds();
+	time->frac = 0;
+}
+
+uint32_t wallclock_seconds(void) {
+	return clock_seconds() + wallclock_delta;
 }
 

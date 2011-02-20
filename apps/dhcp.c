@@ -49,7 +49,7 @@ PROCESS_THREAD(dhcp_process, ev, data) {
 			}
 		}
 		else if (ev == net_link_event) {
-			if (net_flags.link) {
+			if (net_flags.link && !dhcp_status.running) {
 				// Start the dhcp client
 				dhcpc_init(uip_ethaddr.addr, sizeof(uip_ethaddr.addr));
 
@@ -61,7 +61,7 @@ PROCESS_THREAD(dhcp_process, ev, data) {
 				// Post an event
 				process_post(PROCESS_BROADCAST, dhcp_event, &dhcp_status);
 			}
-			else {
+			else if (!net_flags.link && dhcp_status.running) {
 				// De-configure if we need to
 				if (dhcp_status.configured) {
 					dhcpc_unconfigured(dhcp_status.state);

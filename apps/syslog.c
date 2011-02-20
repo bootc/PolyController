@@ -18,7 +18,6 @@
  * MA 02110-1301, USA.
  */
 
-#include <alloca.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -30,16 +29,22 @@
 #include <drivers/wallclock.h>
 #include <init.h>
 #include <time.h>
+#include <strftime.h>
+
+#include "apps/network.h"
 
 #include "syslog.h"
 
-#if UIP_CONF_BUFFER_SIZE < 128
-#define SYSLOG_INIT_ALLOC UIP_CONF_BUFFER_SIZE
+#define SYSLOG_MAX_QUEUE_SIZE 4
+
+#if UIP_CONF_BUFFER_SIZE < 64
+#define SYSLOG_MSG_MAX_LEN UIP_CONF_BUFFER_SIZE
 #else
-#define SYSLOG_INIT_ALLOC 128
+#define SYSLOG_MSG_MAX_LEN 64
 #endif
 
-static const PGM_P time_fmt = "%b %e %H:%M:%S";
+#define UIP_UDP_MAXLEN (UIP_BUFSIZE - UIP_LLH_LEN - UIP_IPUDPH_LEN)
+
 static const uip_ipaddr_t syslog_server = { .u8 = { 81,187,55,68 }};
 
 PROCESS(syslog_process, "syslog");
@@ -50,6 +55,14 @@ static struct uip_udp_conn *conn;
 
 // Log everything by default (!!! mask is inverted !!!)
 static uint8_t log_mask = 0x00;
+
+struct msg_hdr {
+	struct msg_hdr *next;
+	uint32_t pri;
+	time_t time;
+	struct process *process;
+	char msg[SYSLOG_MSG_MAX_LEN];
+};
 
 /*
  * Set the log mask level.
@@ -82,12 +95,12 @@ void syslog_P(uint32_t pri, PGM_P fmt, ...) {
 	va_end(args);
 }
 
-static void append(char *msg, uint8_t *offset, PGM_P format, ...) {
+static void append(char *msg, uint16_t *offset, PGM_P format, ...) {
 	va_list args;
 	int ret;
 
 	// Check offset
-	if (*offset >= SYSLOG_INIT_ALLOC) {
+	if (*offset >= UIP_UDP_MAXLEN) {
 		return;
 	}
 
@@ -95,54 +108,48 @@ static void append(char *msg, uint8_t *offset, PGM_P format, ...) {
 	va_start(args, format);
 	ret = vsnprintf_P(
 		msg + *offset,
-		SYSLOG_INIT_ALLOC - *offset,
+		UIP_UDP_MAXLEN - *offset,
 		format, args);
 	va_end(args);
 
 	// Check length
-	if (*offset + ret > SYSLOG_INIT_ALLOC) {
-		*offset = SYSLOG_INIT_ALLOC;
+	if (*offset + ret > UIP_UDP_MAXLEN) {
+		*offset = UIP_UDP_MAXLEN;
 	}
 	else {
 		*offset += ret;
 	}
 }
 
-static void append_time(char *msg, uint8_t *offset) {
-	char *fmt;
+static void append_time(char *msg, uint16_t *offset, time_t time) {
 	struct tm tm;
 	int ret;
 
 	// Check offset
-	if (*offset >= SYSLOG_INIT_ALLOC) {
+	if (*offset >= UIP_UDP_MAXLEN) {
 		return;
 	}
 
-	// Bring the format string into RAM
-	fmt = alloca(sizeof(time_fmt));
-	strcpy_P(fmt, time_fmt);
-
 	// Get the current time
-	gmtime(wallclock_seconds(), &tm);
+	gmtime(time, &tm);
 
 	// Append formatted string
-	ret = strftime(
+	ret = strftime_P(
 		msg + *offset,
-		SYSLOG_INIT_ALLOC - *offset,
-		fmt, &tm);
+		UIP_UDP_MAXLEN - *offset,
+		PSTR("%b %e %H:%M:%S"), &tm);
 
 	// Check length
-	if (*offset + ret > SYSLOG_INIT_ALLOC) {
-		*offset = SYSLOG_INIT_ALLOC;
+	if (*offset + ret > UIP_UDP_MAXLEN) {
+		*offset = UIP_UDP_MAXLEN;
 	}
 	else {
 		*offset += ret;
 	}
 }
 
-static char *init_msg(uint32_t pri, uint8_t *off) {
-	char *msg;
-	uip_ipaddr_t addr;
+static struct msg_hdr *init_msg(uint32_t pri) {
+	struct msg_hdr *msg;
 
 	// Check the priority against the log_mask
 	if (log_mask & LOG_MASK(LOG_PRI(pri))) {
@@ -150,96 +157,74 @@ static char *init_msg(uint32_t pri, uint8_t *off) {
 	}
 
 	// Allocate memory for the log entry
-	msg = malloc(SYSLOG_INIT_ALLOC);
+	msg = malloc(sizeof(struct msg_hdr));
 	if (msg == NULL) {
 		return NULL;
 	}
 
-	*off = 0;
-
-	// Insert syslog priority
-	append(msg, off, PSTR("<%lu>"), pri);
-
-	// Append time
-	append_time(msg, off);
-
-	// Append hostname (IP address)
-	uip_gethostaddr(&addr);
-	append(msg, off, PSTR(" %d.%d.%d.%d"), uip_ipaddr_to_quad(&addr));
-
-	// Append the process name
-	struct process *p = PROCESS_CURRENT();
-	append(msg, off, PSTR(" %S: "), PROCESS_NAME_STRING(p));
-
-	// Check length
-	if (*off >= SYSLOG_INIT_ALLOC) {
-		free(msg);
-		return NULL;
-	}
+	msg->pri = pri;
+	msg->time = wallclock_seconds();
+	msg->process = PROCESS_CURRENT();
 
 	return msg;
 }
 
+static void msg_finish(struct msg_hdr *msg) {
+	int len = strlen(msg->msg);
+
+	// Reduce memory allocation
+	msg = realloc(msg, sizeof(*msg) - sizeof(msg->msg) + len + 3); // off by two?!
+
+	// Add to the end of the queue
+	list_add(msgq, msg);
+/*
+	// Trim queue if necessary
+	while (list_length(msgq) > SYSLOG_MAX_QUEUE_SIZE) {
+		list_chop(msgq);
+	}*/
+
+	// We have a message to send
+	tcpip_poll_udp(conn);
+}
+
 /* Generate a log message using FMT and using arguments pointed to by AP. */
 void vsyslog(uint32_t pri, const char *fmt, va_list ap) {
-	uint8_t off;
-	char *msg;
-	int ret;
-   
+	struct msg_hdr *msg;
+
 	// Start off the message
-	msg = init_msg(pri, &off);
+	msg = init_msg(pri);
 	if (msg == NULL) {
 		return;
 	}
 
 	// Append the formatted string
-	ret = vsnprintf(
-		msg + off,
-		SYSLOG_INIT_ALLOC - off,
+	vsnprintf(
+		msg->msg,
+		sizeof(msg->msg),
 		fmt, ap);
-	if (off + ret > SYSLOG_INIT_ALLOC) {
-		off = SYSLOG_INIT_ALLOC;
-	}
-	else {
-		off += ret;
-	}
 
-	// Reduce memory allocation
-	msg = realloc(msg, off + 1);
-
-	// Add to the end of the queue
-	list_add(msgq, msg);
+	// Add to queue
+	msg_finish(msg);
 }
 
 /* Generate a log message using FMT and using arguments pointed to by AP. */
 void vsyslog_P(uint32_t pri, PGM_P fmt, va_list ap) {
-	uint8_t off;
-	char *msg;
-	int ret;
-   
+	struct msg_hdr *msg;
+
 	// Start off the message
-	msg = init_msg(pri, &off);
+	msg = init_msg(pri);
 	if (msg == NULL) {
 		return;
 	}
 
 	// Append the formatted string
-	ret = vsnprintf_P(
-		msg + off,
-		SYSLOG_INIT_ALLOC - off,
+	vsnprintf_P(
+		msg->msg,
+		sizeof(msg->msg),
 		fmt, ap);
-	if (off + ret > SYSLOG_INIT_ALLOC) {
-		off = SYSLOG_INIT_ALLOC;
-	}
-	else {
-		off += ret;
-	}
 
-	// Reduce memory allocation
-	msg = realloc(msg, off + 1);
-
-	// Add to the end of the queue
-	list_add(msgq, msg);
+	// Add to queue
+	msg_finish(msg);
 }
 
 static void init(void) {
@@ -251,14 +236,28 @@ static void init(void) {
 	}
 }
 
-static void send_message(char *msg) {
-	int len = strlen(msg);
+static void send_message(struct msg_hdr *msg) {
+	uint16_t off = 0;
+	uip_ipaddr_t addr;
 
-	// Copy the message into uip_appdata
-	memcpy(uip_appdata, msg, len);
+	// Insert syslog priority
+	append(uip_appdata, &off, PSTR("<%lu>"), msg->pri);
+
+	// Append time
+	append_time(uip_appdata, &off, msg->time);
+
+	// Append hostname (IP address)
+	uip_gethostaddr(&addr);
+	append(uip_appdata, &off, PSTR(" %d.%d.%d.%d"), uip_ipaddr_to_quad(&addr));
+
+	// Append the process name
+	append(uip_appdata, &off, PSTR(" %S: "), PROCESS_NAME_STRING(msg->process));
+
+	// Finally, add the message
+	append(uip_appdata, &off, PSTR("%s"), msg->msg);
 
 	// Send the message
-	uip_udp_send(len);
+	uip_udp_send(off);
 }
 
 PROCESS_THREAD(syslog_process, ev, data) {
@@ -271,11 +270,18 @@ PROCESS_THREAD(syslog_process, ev, data) {
 		PROCESS_WAIT_EVENT();
 
 		if (ev == tcpip_event) {
-			// Send a message
-			char *msg = list_pop(msgq);
-			if (msg) {
-				send_message(msg);
-				free(msg);
+			if (net_flags.configured) {
+				// Send a message
+				struct msg_hdr *msg = list_pop(msgq);
+				if (msg) {
+					send_message(msg);
+					free(msg);
+				}
+
+				if (list_head(msgq)) {
+					// We have more messages to send
+					tcpip_poll_udp(conn);
+				}
 			}
 		}
 		else if (ev == PROCESS_EVENT_EXIT) {

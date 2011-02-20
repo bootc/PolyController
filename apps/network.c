@@ -38,6 +38,10 @@
 #include <string.h>
 #include <util/delay.h>
 
+#if CONFIG_APPS_DHCP
+#include "apps/dhcp.h"
+#endif
+
 #define TCPDUMP 0
 #define TCPDUMP_RAWPKT 0
 #define BUF ((struct uip_eth_hdr *)&uip_buf[0])
@@ -240,6 +244,10 @@ static void update_status(void) {
 	new.full_duplex = (phstat3 & PHSTAT3_SPDDPX2) ? 1 : 0;
 #endif
 
+	if (!new.link) {
+		new.configured = 0;
+	}
+
 	// Check if the flags have changed
 	if (memcmp(&new, &net_flags, sizeof(net_flags)) != 0) {
 		net_flags = new;
@@ -294,8 +302,36 @@ PROCESS_THREAD(network_process, ev, data) {
 	tcpip_set_outputfunc(network_send_tcpip);
 	process_poll(&network_process);
 
-	PROCESS_WAIT_UNTIL(ev == PROCESS_EVENT_EXIT);
-	network_exit();
+	while (1) {
+		PROCESS_WAIT_EVENT();
+
+		if (ev == net_link_event) {
+/*			if (net_flags.link) {
+				log_message_P(PSTR("NET: Link UP, %S-%S, %Sconfigured"),
+					net_flags.speed_100m ? PSTR("100M") : PSTR("10M"),
+					net_flags.full_duplex ? PSTR("FDX") : PSTR("HDX"),
+					net_flags.configured ? PSTR("") : PSTR("not "));
+			}
+			else {
+				log_message_P(PSTR("NET: Link DOWN"));
+			}*/
+		}
+#if CONFIG_APPS_DHCP
+		else if (ev == dhcp_event) {
+			if ((dhcp_status.configured && !net_flags.configured) ||
+				(!dhcp_status.configured && net_flags.configured))
+			{
+				net_flags.configured = dhcp_status.configured;
+				process_post(PROCESS_BROADCAST, net_link_event, &net_flags);
+			}
+		}
+#endif
+		else if (ev == PROCESS_EVENT_EXIT) {
+			network_exit();
+			process_exit(&network_process);
+			LOADER_UNLOAD();
+		}
+	}
 
 	PROCESS_END();
 }
