@@ -26,16 +26,20 @@
 
 #include <time.h>
 #include <sntp.h>
-#include "dhcp.h"
 #if CONFIG_DRIVERS_DS1307
 #include "drivers/ds1307.h"
 #endif
 #include "drivers/wallclock.h"
 
+#include "apps/network.h"
+#if CONFIG_APPS_SYSLOG
+#include "apps/syslog.h"
+#endif
+
 #include <stdio.h>
 #include <avr/pgmspace.h>
 
-PROCESS(timesync_process, "SNTP");
+PROCESS(timesync_process, "Time Sync");
 INIT_PROCESS(timesync_process);
 
 timesync_status_t timesync_status;
@@ -98,10 +102,8 @@ PROCESS_THREAD(timesync_process, ev, data) {
 				sntp_appcall(ev, data);
 			}
 		}
-#if CONFIG_APPS_DHCP
-		// FIXME: this logic should be moved elsewhere
-		else if (ev == dhcp_event) {
-			if (dhcp_status.configured && !timesync_status.running) {
+		else if (ev == net_link_event) {
+			if (net_flags.configured && !timesync_status.running) {
 				timesync_status.running = 1;
 				timesync_status.synchronised = 0;
 
@@ -112,8 +114,9 @@ PROCESS_THREAD(timesync_process, ev, data) {
 
 				process_post(PROCESS_BROADCAST, timesync_event,
 					&timesync_status);
+				syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Starting"));
 			}
-			else if (!dhcp_status.configured && timesync_status.running) {
+			else if (!net_flags.configured && timesync_status.running) {
 				timesync_status.running = 0;
 				timesync_status.synchronised = 0;
 
@@ -121,9 +124,9 @@ PROCESS_THREAD(timesync_process, ev, data) {
 
 				process_post(PROCESS_BROADCAST, timesync_event,
 					&timesync_status);
+				syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Stopped"));
 			}
 		}
-#endif
 		else if (ev == PROCESS_EVENT_TIMER) {
 			if (data == &tmr_periodic && etimer_expired(&tmr_periodic)) {
 				etimer_reset(&tmr_periodic);
@@ -167,6 +170,7 @@ int timesync_set_time(const wallclock_time_t *time) {
 
 	// Tell folks about the change
 	process_post(PROCESS_BROADCAST, timesync_event, &timesync_status);
+	syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Clock adjusted"));
 
 #if CONFIG_DRIVERS_DS1307
 	// Get the current RTC time
@@ -195,6 +199,7 @@ void sntp_synced(const struct sntp_hdr *message) {
 	if (!message) {
 		timesync_status.synchronised = 0;
 		process_post(PROCESS_BROADCAST, timesync_event, &timesync_status);
+		syslog_P(LOG_DAEMON | LOG_WARNING, PSTR("SNTP timed out"));
 		return;
 	}
 
@@ -205,6 +210,7 @@ void sntp_synced(const struct sntp_hdr *message) {
 	{
 		timesync_status.synchronised = 0;
 		process_post(PROCESS_BROADCAST, timesync_event, &timesync_status);
+		syslog_P(LOG_DAEMON | LOG_WARNING, PSTR("Invalid SNTP message"));
 		return;
 	}
 
