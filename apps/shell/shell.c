@@ -361,7 +361,7 @@ void shell_output_P(struct shell_command * c, PGM_P fmt, ...) {
 	va_list argp;
 
 	// Skip empty format strings
-	if ((fmt == NULL) || (strlen_P(fmt) == 0)) {
+	if (fmt == NULL) {
 		return;
 	}
 
