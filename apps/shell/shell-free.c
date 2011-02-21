@@ -20,7 +20,6 @@
 
 #include <contiki.h>
 #include <stdarg.h>
-#include "shell-free.h"
 #include "shell.h"
 
 #include <stack.h>
@@ -34,6 +33,8 @@
 #define RAMSIZE (RAMEND - RAMSTART)
 #endif
 
+#define MAX(a, b) ((a) > (b)? (a): (b))
+
 PROCESS(shell_free_process, "free");
 SHELL_COMMAND(shell_free_command,
 	"free", "free: show memory usage",
@@ -44,28 +45,70 @@ INIT_SHELL_COMMAND(shell_free_command);
 extern process_num_events_t process_maxevents;
 #endif
 
-void shell_free_init(void) {
-	shell_register_command(&shell_free_command);
+/* from stdlib_private.h */
+struct __freelist {
+	size_t sz;
+	struct __freelist *nx;
+};
+
+extern char __heap_start;
+extern char __heap_end;
+extern char *__brkval;		/* first location not yet allocated */
+extern struct __freelist *__flp; /* freelist pointer (head of freelist) */
+
+static uint16_t walk_freelist(void) {
+	struct __freelist *fp1;
+	size_t free = 0;
+
+	for (fp1 = __flp; fp1; fp1 = fp1->nx) {
+		free += fp1->sz;
+	}
+
+	return free;
 }
 
 PROCESS_THREAD(shell_free_process, ev, data) {
 	PROCESS_BEGIN();
 
-	const uint16_t stack_size = ((uint16_t)&__stack - (uint16_t)&_end) + 1;
-	uint16_t stack_free = StackCount();
+	// Static memory sections (.data + .bss + .noinit)
+	static const uint16_t static_start = RAMSTART;
+	static const uint16_t static_end = (uint16_t)&_end - 1;
 
+	// Heap memory (malloc area)
+	static const uint16_t heap_start = (uint16_t)&__heap_start;
+	const uint16_t heap_end = (uint16_t)MAX(&__heap_end, (char *)__brkval) - 1;
+	const uint16_t heap_free = walk_freelist();
+
+	// Stack memory
+	const uint16_t stack_start = heap_end + 1;
+	static const uint16_t stack_end = (uint16_t)&__stack;
+	const uint16_t stack_free = StackCount();
+
+	// Print header
 	shell_output_P(&shell_free_command,
 		PSTR("           total        used        free"));
 
+	// Static memory
 	shell_output_P(&shell_free_command,
-		PSTR("Stack:      %4d        %4d        %4d"),
-		stack_size, stack_size - stack_free, stack_free);
+		PSTR("Static:     %4u           -           -"),
+		static_end - static_start + 1);
 
+	// Heap memory
 	shell_output_P(&shell_free_command,
 		PSTR("Heap:       %4d        %4d        %4d"),
-		RAMSIZE - stack_size, RAMSIZE - stack_size, 0);
+		heap_end - heap_start + 1,
+		heap_end - heap_start + 1 - heap_free,
+		heap_free);
+
+	// Stack memory
+	shell_output_P(&shell_free_command,
+		PSTR("Stack:      %4d        %4d        %4d"),
+		stack_end - stack_start + 1,
+		stack_end - stack_start + 1 - stack_free,
+		stack_free);
 
 #if PROCESS_CONF_STATS
+	// Process event stats
 	shell_output_P(&shell_free_command, PSTR(""));
 	shell_output_P(&shell_free_command, PSTR("Max Events: %d"),
 		process_maxevents);
