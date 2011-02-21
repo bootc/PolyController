@@ -2,6 +2,7 @@
 $(curdir)-y += shell.c
 $(curdir)-$(CONFIG_APPS_SHELL_BLINK) += shell-blink.c
 $(curdir)-$(CONFIG_APPS_SHELL_COFFEE) += shell-coffee.c
+$(curdir)-$(CONFIG_APPS_SHELL_DATE) += shell-date.c
 $(curdir)-$(CONFIG_APPS_SHELL_FILE) += shell-file.c
 $(curdir)-$(CONFIG_APPS_SHELL_FREE) += shell-free.c
 $(curdir)-$(CONFIG_APPS_SHELL_NETSTAT) += shell-netstat.c

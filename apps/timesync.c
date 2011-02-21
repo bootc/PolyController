@@ -107,7 +107,7 @@ PROCESS_THREAD(timesync_process, ev, data) {
 				timesync_status.running = 1;
 				timesync_status.synchronised = 0;
 
-				etimer_set(&tmr_periodic, CLOCK_SECOND * 10);
+				etimer_set(&tmr_periodic, CLOCK_SECOND);
 				stimer_set(&tmr_resync, SNTP_RESYNC_INTERVAL);
 
 				sntp_sync(sntp_server);
@@ -156,6 +156,13 @@ PROCESS_THREAD(timesync_process, ev, data) {
 	}
 
 	PROCESS_END();
+}
+
+void timesync_schedule_resync(void) {
+	// Hack the timer
+	if (timesync_status.running) {
+		tmr_resync.start = clock_seconds() - tmr_resync.interval;
+	}
 }
 
 int timesync_set_time(const wallclock_time_t *time) {
