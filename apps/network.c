@@ -222,10 +222,6 @@ static void network_init(void) {
 #endif
 }
 
-static void network_exit(void) {
-
-}
-
 static void update_status(void) {
 	network_flags_t new = net_flags;
 
@@ -338,7 +334,6 @@ PROCESS_THREAD(network_process, ev, data) {
 		else
 #endif
 		if (ev == PROCESS_EVENT_EXIT) {
-			network_exit();
 			process_exit(&network_process);
 			LOADER_UNLOAD();
 		}
@@ -348,6 +343,12 @@ PROCESS_THREAD(network_process, ev, data) {
 }
 
 void uip_log(char *msg) {
+#if CONFIG_APPS_SYSLOG
+	syslog_P(
+		LOG_KERN | LOG_NOTICE,
+		PSTR("%s"), msg);
+#else
 	printf_P(PSTR("%s\n"), msg);
+#endif
 }
 

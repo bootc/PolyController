@@ -23,6 +23,10 @@
 #include "dhcp.h"
 #include <init.h>
 
+#if CONFIG_APPS_SYSLOG
+#include "apps/syslog.h"
+#endif
+
 #define DHCPC_CLIENT_PORT  68
 
 PROCESS(dhcp_process, "DHCP");
@@ -60,13 +64,11 @@ PROCESS_THREAD(dhcp_process, ev, data) {
 
 				// Post an event
 				process_post(PROCESS_BROADCAST, dhcp_event, &dhcp_status);
+#if CONFIG_APPS_SYSLOG
+				syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Starting"));
+#endif
 			}
 			else if (!net_flags.link && dhcp_status.running) {
-				// De-configure if we need to
-				if (dhcp_status.configured) {
-					dhcpc_unconfigured(dhcp_status.state);
-				}
-	
 				// bit of a hack to clean up the connection table
 				for (uint8_t i = 0; i < UIP_UDP_CONNS; i++) {
 					if (uip_udp_conns[i].lport ==
@@ -84,6 +86,9 @@ PROCESS_THREAD(dhcp_process, ev, data) {
 
 				// Post an event
 				process_post(PROCESS_BROADCAST, dhcp_event, &dhcp_status);
+#if CONFIG_APPS_SYSLOG
+				syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Stopped"));
+#endif
 			}
 		}
 		else if (ev == PROCESS_EVENT_EXIT) {
@@ -108,6 +113,24 @@ void dhcpc_configured(const struct dhcpc_state *s) {
 
 	// Post an event
 	process_post(PROCESS_BROADCAST, dhcp_event, &dhcp_status);
+
+#if CONFIG_APPS_SYSLOG
+	syslog_P(
+		LOG_DAEMON | LOG_INFO,
+		PSTR("Got addr %d.%d.%d.%d/%d.%d.%d.%d (exp %lds)"),
+		uip_ipaddr_to_quad(&s->ipaddr),
+		uip_ipaddr_to_quad(&s->netmask),
+		uip_ntohs(s->lease_time[0]) * 65536ul +
+		uip_ntohs(s->lease_time[1]));
+	syslog_P(
+		LOG_DAEMON | LOG_INFO,
+		PSTR("Default route %d.%d.%d.%d"),
+		uip_ipaddr_to_quad(&s->default_router));
+	syslog_P(
+		LOG_DAEMON | LOG_INFO,
+		PSTR("DNS server %d.%d.%d.%d"),
+		uip_ipaddr_to_quad(&s->dnsaddr));
+#endif
 }
 
 void dhcpc_unconfigured(const struct dhcpc_state *s) {
@@ -117,5 +140,8 @@ void dhcpc_unconfigured(const struct dhcpc_state *s) {
 
 	// Post an event
 	process_post(PROCESS_BROADCAST, dhcp_event, &dhcp_status);
+#if CONFIG_APPS_SYSLOG
+	syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Unconfigured (lease expired)"));
+#endif
 }
 

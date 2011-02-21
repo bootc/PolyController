@@ -39,7 +39,7 @@
 #include <stdio.h>
 #include <avr/pgmspace.h>
 
-PROCESS(timesync_process, "Time Sync");
+PROCESS(timesync_process, "TimeSync");
 INIT_PROCESS(timesync_process);
 
 timesync_status_t timesync_status;

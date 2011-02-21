@@ -44,7 +44,7 @@
 #include "webserver.h"
 #include "httpd.h"
 
-PROCESS(webserver_process, "Web server");
+PROCESS(webserver_process, "Webserver");
 INIT_PROCESS(webserver_process);
 
 PROCESS_THREAD(webserver_process, ev, data) {

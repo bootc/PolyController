@@ -47,7 +47,7 @@
 
 static const uip_ipaddr_t syslog_server = { .u8 = { 81,187,55,68 }};
 
-PROCESS(syslog_process, "syslog");
+PROCESS(syslog_process, "Syslog");
 INIT_PROCESS(syslog_process);
 LIST(msgq);
 

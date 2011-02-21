@@ -20,24 +20,15 @@
 
 #include <contiki-net.h>
 #include <init.h>
-#include <time.h>
-#include <strftime.h>
 #include "monitor.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <avr/pgmspace.h>
-#include <sys/stimer.h>
+//#include <stdio.h>
+//#include <avr/pgmspace.h>
 
-#include "network.h"
 #if CONFIG_APPS_DHCP
 #include "dhcp.h"
 #endif
-#include "shell/shell.h"
-#if CONFIG_APPS_SYSLOG
-#include "syslog.h"
-#endif
-#include "timesync.h"
+//#include "shell/shell.h"
 
 #include "drivers/wallclock.h"
 
@@ -46,15 +37,13 @@ INIT_PROCESS(monitor_process);
 
 static struct etimer heartbeat;
 
+/*
 static void log_message_P(PGM_P fmt, ...) {
 	va_list argp;
 
 	printf_P(PSTR("\r\x1b[2K\x1b[01;32m"));
 
 	va_start(argp, fmt);
-#if CONFIG_APPS_SYSLOG
-	vsyslog_P(LOG_MAKEPRI(LOG_USER, LOG_INFO), fmt, argp);
-#endif
 	vfprintf_P(stdout, fmt, argp);
 	va_end(argp);
 
@@ -62,6 +51,7 @@ static void log_message_P(PGM_P fmt, ...) {
 
 	shell_prompt_P(PSTR("Contiki> "));
 }
+*/
 
 PROCESS_THREAD(monitor_process, ev, data) {
 	PROCESS_BEGIN();
@@ -72,68 +62,18 @@ PROCESS_THREAD(monitor_process, ev, data) {
 	while (1) {
 		PROCESS_WAIT_EVENT();
 
-		if (ev == net_link_event) {
-			if (net_flags.link) {
-				log_message_P(PSTR("NET: Link UP, %S-%S, %Sconfigured"),
-						net_flags.speed_100m ? PSTR("100M") : PSTR("10M"),
-						net_flags.full_duplex ? PSTR("FDX") : PSTR("HDX"),
-						net_flags.configured ? PSTR("") : PSTR("not "));
-			}
-			else {
-				log_message_P(PSTR("NET: Link DOWN"));
-			}
-		}
 #if CONFIG_APPS_DHCP
-		else if (ev == dhcp_event) {
-			log_message_P(PSTR("DHCP: %Srunning, %Sconfigured"),
-				dhcp_status.running ? PSTR("") : PSTR("not "),
-				dhcp_status.configured ? PSTR("") : PSTR("not "));
-
+		if (ev == dhcp_event) {
 			if (dhcp_status.configured) {
 				PORTD |= _BV(PIND7);
-
-				const struct dhcpc_state *s = dhcp_status.state;
-
-				log_message_P(PSTR("DHCP: Got addr %d.%d.%d.%d/%d.%d.%d.%d (exp %lds)"),
-					uip_ipaddr_to_quad(&s->ipaddr),
-					uip_ipaddr_to_quad(&s->netmask),
-					uip_ntohs(s->lease_time[0]) * 65536ul +
-					uip_ntohs(s->lease_time[1]));
-				log_message_P(PSTR("DHCP: Default route %d.%d.%d.%d"),
-					uip_ipaddr_to_quad(&s->default_router));
-				log_message_P(PSTR("DHCP: DNS server %d.%d.%d.%d"),
-					uip_ipaddr_to_quad(&s->dnsaddr));
 			}
 			else {
 				PORTD &= ~_BV(PIND7);
 			}
 		}
+		else
 #endif
-#if CONFIG_APPS_TIMESYNC
-		else if (ev == timesync_event) {
-			log_message_P(PSTR("TimeSync: %Srunning, %Sin sync"),
-				timesync_status.running ? PSTR("") : PSTR("not "),
-				timesync_status.synchronised ? PSTR("") : PSTR("not "));
-
-			wallclock_time_t time;
-			struct tm tm;
-			char *ts = malloc(64);
-			if (!ts) {
-				continue;
-			}
-
-			wallclock_get(&time);
-			gmtime(time.sec, &tm);
-
-			uint32_t ms = ((uint32_t)time.frac * 1000) >> 12;
-
-			strftime_P(ts, 64, PSTR("%c"), &tm);
-			log_message_P(PSTR("Wallclock: Time is %s; %lums"),
-				ts, ms);
-			free(ts);
-		}
-#endif
-		else if (ev == PROCESS_EVENT_TIMER) {
+		if (ev == PROCESS_EVENT_TIMER) {
 			if (data == &heartbeat &&
 				etimer_expired(&heartbeat))
 			{

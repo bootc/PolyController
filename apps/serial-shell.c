@@ -54,7 +54,7 @@
 #include "shell/shell.h"
 
 /*---------------------------------------------------------------------------*/
-PROCESS(serial_shell_process, "Contiki serial shell");
+PROCESS(serial_shell_process, "Serial Shell");
 INIT_PROCESS(serial_shell_process);
 /*---------------------------------------------------------------------------*/
 void shell_default_output(PGM_P fmt, va_list args) {
