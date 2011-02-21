@@ -41,6 +41,9 @@
 #if CONFIG_APPS_DHCP
 #include "apps/dhcp.h"
 #endif
+#if CONFIG_APPS_SYSLOG
+#include "apps/syslog.h"
+#endif
 
 #define TCPDUMP 0
 #define TCPDUMP_RAWPKT 0
@@ -305,19 +308,26 @@ PROCESS_THREAD(network_process, ev, data) {
 	while (1) {
 		PROCESS_WAIT_EVENT();
 
+#if CONFIG_APPS_SYSLOG
 		if (ev == net_link_event) {
-/*			if (net_flags.link) {
-				log_message_P(PSTR("NET: Link UP, %S-%S, %Sconfigured"),
+			if (net_flags.link) {
+				syslog_P(
+					LOG_KERN | LOG_NOTICE,
+					PSTR("Link UP, %S-%S, %Sconfigured"),
 					net_flags.speed_100m ? PSTR("100M") : PSTR("10M"),
 					net_flags.full_duplex ? PSTR("FDX") : PSTR("HDX"),
 					net_flags.configured ? PSTR("") : PSTR("not "));
 			}
 			else {
-				log_message_P(PSTR("NET: Link DOWN"));
-			}*/
+				syslog_P(
+					LOG_KERN | LOG_NOTICE,
+					PSTR("NET: Link DOWN"));
+			}
 		}
+		else
+#endif
 #if CONFIG_APPS_DHCP
-		else if (ev == dhcp_event) {
+		if (ev == dhcp_event) {
 			if ((dhcp_status.configured && !net_flags.configured) ||
 				(!dhcp_status.configured && net_flags.configured))
 			{
@@ -325,8 +335,9 @@ PROCESS_THREAD(network_process, ev, data) {
 				process_post(PROCESS_BROADCAST, net_link_event, &net_flags);
 			}
 		}
+		else
 #endif
-		else if (ev == PROCESS_EVENT_EXIT) {
+		if (ev == PROCESS_EVENT_EXIT) {
 			network_exit();
 			process_exit(&network_process);
 			LOADER_UNLOAD();
