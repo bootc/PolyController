@@ -35,7 +35,7 @@
 
 #include "syslog.h"
 
-#define SYSLOG_MAX_QUEUE_SIZE 6
+#define SYSLOG_MAX_QUEUE_SIZE 8
 
 #if UIP_CONF_BUFFER_SIZE < 64
 #define SYSLOG_MSG_MAX_LEN UIP_CONF_BUFFER_SIZE
@@ -176,16 +176,14 @@ static struct msg_hdr *init_msg(uint32_t pri) {
 }
 
 static void msg_finish(struct msg_hdr *msg) {
-	int len = strlen(msg->msg);
-
-	// Reduce memory allocation (off by two in realloc?)
-	msg = realloc(msg, sizeof(*msg) - sizeof(msg->msg) + len + 3);
+	// Check whether to poll connection
+	if (!list_head(msgq)) {
+		// We have a message to send
+		tcpip_poll_udp(conn);
+	}
 
 	// Add to the end of the queue
 	list_add(msgq, msg);
-
-	// We have a message to send
-	tcpip_poll_udp(conn);
 }
 
 /* Generate a log message using FMT and using arguments pointed to by AP. */
