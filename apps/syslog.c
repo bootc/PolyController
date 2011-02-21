@@ -35,7 +35,7 @@
 
 #include "syslog.h"
 
-#define SYSLOG_MAX_QUEUE_SIZE 4
+#define SYSLOG_MAX_QUEUE_SIZE 6
 
 #if UIP_CONF_BUFFER_SIZE < 64
 #define SYSLOG_MSG_MAX_LEN UIP_CONF_BUFFER_SIZE
@@ -156,6 +156,12 @@ static struct msg_hdr *init_msg(uint32_t pri) {
 		return NULL;
 	}
 
+	// Trim queue if necessary
+	while (list_length(msgq) >= SYSLOG_MAX_QUEUE_SIZE) {
+		struct msg_hdr *tmp = list_pop(msgq);
+		free(tmp);
+	}
+
 	// Allocate memory for the log entry
 	msg = malloc(sizeof(struct msg_hdr));
 	if (msg == NULL) {
@@ -172,16 +178,11 @@ static struct msg_hdr *init_msg(uint32_t pri) {
 static void msg_finish(struct msg_hdr *msg) {
 	int len = strlen(msg->msg);
 
-	// Reduce memory allocation
-	msg = realloc(msg, sizeof(*msg) - sizeof(msg->msg) + len + 3); // off by two?!
+	// Reduce memory allocation (off by two in realloc?)
+	msg = realloc(msg, sizeof(*msg) - sizeof(msg->msg) + len + 3);
 
 	// Add to the end of the queue
 	list_add(msgq, msg);
-/*
-	// Trim queue if necessary
-	while (list_length(msgq) > SYSLOG_MAX_QUEUE_SIZE) {
-		list_chop(msgq);
-	}*/
 
 	// We have a message to send
 	tcpip_poll_udp(conn);
@@ -248,10 +249,12 @@ static void send_message(struct msg_hdr *msg) {
 
 	// Append hostname (IP address)
 	uip_gethostaddr(&addr);
-	append(uip_appdata, &off, PSTR(" %d.%d.%d.%d"), uip_ipaddr_to_quad(&addr));
+	append(uip_appdata, &off, PSTR(" %d.%d.%d.%d"),
+		uip_ipaddr_to_quad(&addr));
 
 	// Append the process name
-	append(uip_appdata, &off, PSTR(" %S: "), PROCESS_NAME_STRING(msg->process));
+	append(uip_appdata, &off, PSTR(" %S: "),
+		PROCESS_NAME_STRING(msg->process));
 
 	// Finally, add the message
 	append(uip_appdata, &off, PSTR("%s"), msg->msg);
