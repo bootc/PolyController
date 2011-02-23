@@ -37,6 +37,4 @@ extern process_event_t timesync_event;
 void timesync_schedule_resync(void);
 int timesync_set_time(const wallclock_time_t *time);
 
-PROCESS_NAME(timesync_process);
-
 #endif

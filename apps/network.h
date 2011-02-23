@@ -26,11 +26,9 @@ typedef struct {
 	int speed_100m : 1;
 	int full_duplex : 1;
 	int configured : 1;
-} network_flags_t;
+} network_status_t;
 
-extern process_event_t net_link_event;
-extern network_flags_t net_flags;
-
-PROCESS_NAME(network_process);
+extern process_event_t net_event;
+extern network_status_t net_status;
 
 #endif

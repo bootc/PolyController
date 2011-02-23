@@ -52,8 +52,8 @@ PROCESS_THREAD(dhcp_process, ev, data) {
 				dhcpc_appcall(ev, data);
 			}
 		}
-		else if (ev == net_link_event) {
-			if (net_flags.link && !dhcp_status.running) {
+		else if (ev == net_event) {
+			if (net_status.link && !dhcp_status.running) {
 				// Start the dhcp client
 				dhcpc_init(uip_ethaddr.addr, sizeof(uip_ethaddr.addr));
 
@@ -68,7 +68,7 @@ PROCESS_THREAD(dhcp_process, ev, data) {
 				syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Starting"));
 #endif
 			}
-			else if (!net_flags.link && dhcp_status.running) {
+			else if (!net_status.link && dhcp_status.running) {
 				// bit of a hack to clean up the connection table
 				for (uint8_t i = 0; i < UIP_UDP_CONNS; i++) {
 					if (uip_udp_conns[i].lport ==

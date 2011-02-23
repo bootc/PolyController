@@ -21,8 +21,4 @@
 #ifndef __MONITOR_H__
 #define __MONITOR_H__
 
-void monitor_init(void);
-
-PROCESS_NAME(monitor_process);
-
 #endif

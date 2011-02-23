@@ -21,6 +21,4 @@
 #ifndef APPS_SERIAL_H
 #define APPS_SERIAL_H
 
-PROCESS_NAME(serial_process);
-
 #endif

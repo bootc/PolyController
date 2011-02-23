@@ -32,6 +32,4 @@ typedef struct {
 extern process_event_t dhcp_event;
 extern dhcp_status_t dhcp_status;
 
-PROCESS_NAME(dhcp_process);
-
 #endif

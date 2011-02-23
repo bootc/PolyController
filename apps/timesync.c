@@ -102,8 +102,8 @@ PROCESS_THREAD(timesync_process, ev, data) {
 				sntp_appcall(ev, data);
 			}
 		}
-		else if (ev == net_link_event) {
-			if (net_flags.configured && !timesync_status.running) {
+		else if (ev == net_event) {
+			if (net_status.configured && !timesync_status.running) {
 				timesync_status.running = 1;
 				timesync_status.synchronised = 0;
 
@@ -116,7 +116,7 @@ PROCESS_THREAD(timesync_process, ev, data) {
 					&timesync_status);
 				syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Starting"));
 			}
-			else if (!net_flags.configured && timesync_status.running) {
+			else if (!net_status.configured && timesync_status.running) {
 				timesync_status.running = 0;
 				timesync_status.synchronised = 0;
 

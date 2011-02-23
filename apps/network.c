@@ -50,8 +50,8 @@
 #define BUF ((struct uip_eth_hdr *)&uip_buf[0])
 #define IPBUF ((struct uip_tcpip_hdr *)&uip_buf[UIP_LLH_LEN])
 
-process_event_t net_link_event;
-network_flags_t net_flags;
+process_event_t net_event;
+network_status_t net_status;
 
 #if CONFIG_DRIVERS_ENC28J60
 static struct uip_eth_addr mac PROGMEM =
@@ -179,7 +179,7 @@ static uint8_t network_send_tcpip(void) {
 #endif
 
 static void network_init(void) {
-	net_link_event = process_alloc_event();
+	net_event = process_alloc_event();
 
 #if CONFIG_DRIVERS_ENC28J60
 	// Set our MAC address
@@ -223,7 +223,7 @@ static void network_init(void) {
 }
 
 static void update_status(void) {
-	network_flags_t new = net_flags;
+	network_status_t new = net_status;
 
 #if CONFIG_DRIVERS_ENC28J60
 	uint16_t phstat1 = enc28j60PhyRead(PHSTAT1);
@@ -232,8 +232,8 @@ static void update_status(void) {
 	new.link = (phstat1 & PHSTAT1_LLSTAT) ? 1 : 0;
 	new.speed_100m = 0; // this chip only does 10M
 	new.full_duplex = (phstat2 & PHSTAT2_DPXSTAT) ? 1 : 0;
-
 #endif
+
 #if CONFIG_DRIVERS_ENC424J600
 	uint16_t phstat1 = enc424j600ReadPHYReg(PHSTAT1);
 	uint16_t phstat3 = enc424j600ReadPHYReg(PHSTAT3);
@@ -248,11 +248,11 @@ static void update_status(void) {
 	}
 
 	// Check if the flags have changed
-	if (memcmp(&new, &net_flags, sizeof(net_flags)) != 0) {
-		net_flags = new;
+	if (memcmp(&new, &net_status, sizeof(net_status)) != 0) {
+		net_status = new;
 
 		// Send link change event
-		process_post(PROCESS_BROADCAST, net_link_event, &net_flags);
+		process_post(PROCESS_BROADCAST, net_event, &net_status);
 	}
 }
 
@@ -305,14 +305,14 @@ PROCESS_THREAD(network_process, ev, data) {
 		PROCESS_WAIT_EVENT();
 
 #if CONFIG_APPS_SYSLOG
-		if (ev == net_link_event) {
-			if (net_flags.link) {
+		if (ev == net_event) {
+			if (net_status.link) {
 				syslog_P(
 					LOG_KERN | LOG_NOTICE,
 					PSTR("Link UP, %S-%S, %Sconfigured"),
-					net_flags.speed_100m ? PSTR("100M") : PSTR("10M"),
-					net_flags.full_duplex ? PSTR("FDX") : PSTR("HDX"),
-					net_flags.configured ? PSTR("") : PSTR("not "));
+					net_status.speed_100m ? PSTR("100M") : PSTR("10M"),
+					net_status.full_duplex ? PSTR("FDX") : PSTR("HDX"),
+					net_status.configured ? PSTR("") : PSTR("not "));
 			}
 			else {
 				syslog_P(
@@ -324,11 +324,9 @@ PROCESS_THREAD(network_process, ev, data) {
 #endif
 #if CONFIG_APPS_DHCP
 		if (ev == dhcp_event) {
-			if ((dhcp_status.configured && !net_flags.configured) ||
-				(!dhcp_status.configured && net_flags.configured))
-			{
-				net_flags.configured = dhcp_status.configured;
-				process_post(PROCESS_BROADCAST, net_link_event, &net_flags);
+			if (dhcp_status.configured != net_status.configured) {
+				net_status.configured = dhcp_status.configured;
+				process_post(PROCESS_BROADCAST, net_event, &net_status);
 			}
 		}
 		else

@@ -41,8 +41,5 @@
 #ifndef __SERIAL_SHELL_H__
 #define __SERIAL_SHELL_H__
 
-#include "contiki.h"
-
-PROCESS_NAME(serial_shell_process);
 
 #endif /* __SERIAL_SHELL_H__ */

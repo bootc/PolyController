@@ -271,7 +271,7 @@ PROCESS_THREAD(syslog_process, ev, data) {
 		PROCESS_WAIT_EVENT();
 
 		if (ev == tcpip_event) {
-			if (net_flags.configured) {
+			if (net_status.configured) {
 				// Send a message
 				struct msg_hdr *msg = list_pop(msgq);
 				if (msg) {

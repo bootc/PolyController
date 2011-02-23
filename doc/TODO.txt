@@ -1,10 +1,8 @@
 
 * Command-line CFS/PolyFS peeking
 * Command-line 1-wire peeking
-* Command-line clock manipulation (RTC/wallclock/NTP)
 * Command-line sensor interface
 * Command-line owfs interface
-* Command-line ARP table list
 
 * Configuration framework
  * EEPROM read/write
