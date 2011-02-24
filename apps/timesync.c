@@ -22,6 +22,8 @@
 #include <sys/stimer.h>
 #include <stdlib.h>
 #include <init.h>
+#include <alloca.h>
+#include <avr/pgmspace.h>
 #include "timesync.h"
 
 #include <time.h>
@@ -36,8 +38,7 @@
 #include "apps/syslog.h"
 #endif
 
-#include <stdio.h>
-#include <avr/pgmspace.h>
+const char sntp_server_name[] PROGMEM = "tarquin.bootc.net";
 
 PROCESS(timesync_process, "TimeSync");
 INIT_PROCESS(timesync_process);
@@ -45,10 +46,10 @@ INIT_PROCESS(timesync_process);
 timesync_status_t timesync_status;
 process_event_t timesync_event;
 
-static const uip_ipaddr_t sntp_server = { .u8 = { 81,187,55,68 }};
-
+static uip_ipaddr_t *sntp_server = NULL;
 static struct etimer tmr_periodic;
 static struct stimer tmr_resync;
+static struct stimer tmr_lookup;
 
 static int init(void) {
 #if CONFIG_DRIVERS_DS1307
@@ -88,6 +89,35 @@ static int init(void) {
 	return 0;
 }
 
+static void sntp_lookup_sync(void) {
+	// Copy the host name into RAM (stack)
+	char *host = alloca(strlen_P(sntp_server_name));
+	strcpy_P(host, sntp_server_name);
+
+	// Check if the lookup timer has expired
+	if (sntp_server != NULL &&
+		stimer_expired(&tmr_lookup))
+	{
+		// Yep, clear the IP address
+		sntp_server = NULL;
+	}
+	// Check if we need to lookup the IP in the resolver's table
+	else if (sntp_server == NULL &&
+		!stimer_expired(&tmr_lookup))
+	{
+		sntp_server = resolv_lookup(host);
+	}
+
+	// Perform a sync if we have an IP
+	if (sntp_server != NULL) {
+		sntp_sync(*sntp_server);
+	}
+	// Otherwise start a lookup
+	else {
+		resolv_query(host);
+	}
+}
+
 PROCESS_THREAD(timesync_process, ev, data) {
 	PROCESS_BEGIN();
 
@@ -110,15 +140,16 @@ PROCESS_THREAD(timesync_process, ev, data) {
 				etimer_set(&tmr_periodic, CLOCK_SECOND);
 				stimer_set(&tmr_resync, SNTP_RESYNC_INTERVAL);
 
-				sntp_sync(sntp_server);
-
 				process_post(PROCESS_BROADCAST, timesync_event,
 					&timesync_status);
 				syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Starting"));
+
+				sntp_lookup_sync();
 			}
 			else if (!net_status.configured && timesync_status.running) {
 				timesync_status.running = 0;
 				timesync_status.synchronised = 0;
+				sntp_server = NULL;
 
 				etimer_stop(&tmr_periodic);
 
@@ -134,12 +165,16 @@ PROCESS_THREAD(timesync_process, ev, data) {
 				if (timesync_status.running && stimer_expired(&tmr_resync)) {
 					stimer_reset(&tmr_resync);
 
-					sntp_sync(sntp_server);
+					sntp_lookup_sync();
 				}
 			}
 			else if (timesync_status.running) {
 				sntp_appcall(ev, data);
 			}
+		}
+		else if (ev == resolv_event_found) {
+			stimer_set(&tmr_lookup, SNTP_DNS_TTL);
+			sntp_lookup_sync();
 		}
 		else if (ev == PROCESS_EVENT_EXIT) {
 			timesync_status.running = 0;

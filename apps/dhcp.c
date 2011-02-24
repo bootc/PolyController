@@ -105,7 +105,9 @@ void dhcpc_configured(const struct dhcpc_state *s) {
 	uip_sethostaddr(&s->ipaddr);
 	uip_setnetmask(&s->netmask);
 	uip_setdraddr(&s->default_router);
-	//resolv_conf(&s->dnsaddr);
+#if CONFIG_APPS_RESOLV
+	resolv_conf(&s->dnsaddr);
+#endif
 
 	// Update our internal status
 	dhcp_status.state = s;

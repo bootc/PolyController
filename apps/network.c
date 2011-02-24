@@ -253,6 +253,21 @@ static void update_status(void) {
 
 		// Send link change event
 		process_post(PROCESS_BROADCAST, net_event, &net_status);
+
+#if CONFIG_APPS_SYSLOG
+		if (net_status.link) {
+			syslog_P(
+				LOG_KERN | LOG_NOTICE,
+				PSTR("Link UP, %S-%S"),
+				net_status.speed_100m ? PSTR("100M") : PSTR("10M"),
+				net_status.full_duplex ? PSTR("FDX") : PSTR("HDX"));
+		}
+		else {
+			syslog_P(
+				LOG_KERN | LOG_NOTICE,
+				PSTR("NET: Link DOWN"));
+		}
+#endif
 	}
 }
 
@@ -304,29 +319,18 @@ PROCESS_THREAD(network_process, ev, data) {
 	while (1) {
 		PROCESS_WAIT_EVENT();
 
-#if CONFIG_APPS_SYSLOG
-		if (ev == net_event) {
-			if (net_status.link) {
-				syslog_P(
-					LOG_KERN | LOG_NOTICE,
-					PSTR("Link UP, %S-%S, %Sconfigured"),
-					net_status.speed_100m ? PSTR("100M") : PSTR("10M"),
-					net_status.full_duplex ? PSTR("FDX") : PSTR("HDX"),
-					net_status.configured ? PSTR("") : PSTR("not "));
-			}
-			else {
-				syslog_P(
-					LOG_KERN | LOG_NOTICE,
-					PSTR("NET: Link DOWN"));
-			}
-		}
-		else
-#endif
 #if CONFIG_APPS_DHCP
 		if (ev == dhcp_event) {
 			if (dhcp_status.configured != net_status.configured) {
 				net_status.configured = dhcp_status.configured;
 				process_post(PROCESS_BROADCAST, net_event, &net_status);
+
+#if CONFIG_APPS_SYSLOG
+				syslog_P(
+					LOG_KERN | LOG_NOTICE,
+					PSTR("IP %Sconfigured"),
+					net_status.configured ? PSTR("") : PSTR("de-"));
+#endif
 			}
 		}
 		else

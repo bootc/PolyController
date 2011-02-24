@@ -25,6 +25,7 @@
 
 // How often to refresh the local time offset (in seconds)
 #define SNTP_RESYNC_INTERVAL	600
+#define SNTP_DNS_TTL			3600
 
 typedef struct {
 	int					running : 1;
