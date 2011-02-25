@@ -259,8 +259,6 @@ static void send_message(struct msg_hdr *msg) {
 	// Finally, add the message
 	append(uip_appdata, &off, PSTR("%s"), msg->msg);
 
-	printf_P(PSTR("syslog: %s\n"), uip_appdata);
-
 	// Send the message
 	uip_udp_send(off);
 }
