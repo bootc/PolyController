@@ -18,24 +18,30 @@
  * MA 02110-1301, USA.
  */
 
-#ifndef __TIMESYNC_H__
-#define __TIMESYNC_H__
+#ifndef RESOLV_HELPER_H
+#define RESOLV_HELPER_H
 
-#include "drivers/wallclock.h"
+#include <contiki-net.h>
+#include <sys/stimer.h>
 
-// How often to refresh the local time offset (in seconds)
-#define SNTP_RESYNC_INTERVAL	1800
+enum resolv_helper_state {
+	RESOLV_HELPER_STATE_NEW = 0,
+	RESOLV_HELPER_STATE_ASKING,
+	RESOLV_HELPER_STATE_DONE,
+	RESOLV_HELPER_STATE_EXPIRED,
+	RESOLV_HELPER_STATE_ERROR
+};
 
-typedef struct {
-	int running : 1;
-	int sync_pending : 1;
-	int synchronised : 1;
-} timesync_status_t;
+struct resolv_helper_status {
+	enum resolv_helper_state state;
+	struct pt pt;
+	struct stimer expire;
+	char name[32];
+	uip_ipaddr_t ipaddr;
+};
 
-extern timesync_status_t timesync_status;
-extern process_event_t timesync_event;
+void resolv_helper_lookup(struct resolv_helper_status *st);
+void resolv_helper_appcall(struct resolv_helper_status *st,
+	process_event_t ev, void *data);
 
-void timesync_schedule_resync(void);
-int timesync_set_time(const wallclock_time_t *time);
-
-#endif
+#endif // RESOLV_HELPER_H

@@ -54,7 +54,7 @@
  */
 
 #include <contiki-net.h>
-#include "resolv.h"
+#include <net/resolv.h>
 #if UIP_UDP
 
 #include <init.h>

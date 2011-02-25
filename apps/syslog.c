@@ -26,7 +26,7 @@
 #include <string.h>
 #include <avr/pgmspace.h>
 #include <contiki-net.h>
-#include <sys/stimer.h>
+#include <resolv_helper.h>
 
 #include <drivers/wallclock.h>
 #include <init.h>
@@ -46,8 +46,6 @@
 
 #define UIP_UDP_MAXLEN (UIP_BUFSIZE - UIP_LLH_LEN - UIP_IPUDPH_LEN)
 
-#define SYSLOG_DNS_TTL 3600
-
 const char syslog_server_name[] PROGMEM = "tarquin.bootc.net";
 
 PROCESS(syslog_process, "Syslog");
@@ -55,8 +53,7 @@ INIT_PROCESS(syslog_process);
 LIST(msgq);
 
 static struct uip_udp_conn *conn;
-static uip_ipaddr_t *syslog_server = NULL;
-static struct stimer tmr_lookup;
+static struct resolv_helper_status res;
 
 // Log everything by default (!!! mask is inverted !!!)
 static uint8_t log_mask = 0x00;
@@ -181,14 +178,11 @@ static struct msg_hdr *init_msg(uint32_t pri) {
 }
 
 static void msg_finish(struct msg_hdr *msg) {
-	// Check whether to poll connection
-	if (!list_head(msgq) && conn) {
-		// We have a message to send
-		tcpip_poll_udp(conn);
-	}
-
 	// Add to the end of the queue
 	list_add(msgq, msg);
+
+	// Poll the process to send message
+	process_poll(&syslog_process);
 }
 
 /* Generate a log message using FMT and using arguments pointed to by AP. */
@@ -234,6 +228,65 @@ void vsyslog_P(uint32_t pri, PGM_P fmt, va_list ap) {
 static void init(void) {
 	list_init(msgq);
 
+	// Copy the host name into the resolv helper structure
+	strncpy_P(res.name, syslog_server_name, sizeof(res.name));
+
+	// Launch the lookup
+	resolv_helper_lookup(&res);
+}
+
+static void poll_if_required(void) {
+	if (list_head(msgq)) {
+		// We have more messages to send
+		process_poll(&syslog_process);
+	}
+}
+
+static void check_connection(void) {
+	// Don't do anything unless IP is working
+	if (!net_status.configured) {
+		return;
+	}
+
+	if (res.state == RESOLV_HELPER_STATE_ASKING) {
+		// Just wait
+		return;
+	}
+	else if (res.state == RESOLV_HELPER_STATE_DONE) {
+		// Check if the IP has changed (remove the connection)
+		if (conn != NULL &&
+			!uip_ipaddr_cmp(&conn->ripaddr, &res.ipaddr))
+		{
+			uip_udp_remove(conn);
+			conn = NULL;
+		}
+
+		// Check if we need to set up the connection
+		if (conn != NULL) {
+			return;
+		}
+
+		// Set up the connection
+		conn = udp_new(&res.ipaddr, UIP_HTONS(SYSLOG_PORT), NULL);
+		if (!conn) {
+			return;
+		}
+
+		// Bind to the correct source port
+		udp_bind(conn, UIP_HTONS(SYSLOG_PORT));
+	}
+	else if (res.state == RESOLV_HELPER_STATE_EXPIRED) {
+		// Refresh an expired lookup
+		resolv_helper_lookup(&res);
+	}
+	else if (res.state == RESOLV_HELPER_STATE_ERROR) {
+		// Clear the connection
+		if (conn) {
+			uip_udp_remove(conn);
+		}
+
+		// FIXME: handle error
+	}
 }
 
 static void send_message(struct msg_hdr *msg) {
@@ -262,57 +315,23 @@ static void send_message(struct msg_hdr *msg) {
 	uip_udp_send(off);
 }
 
-static void lookup_and_send(void) {
+static void send_messages(void) {
 	// Don't do anything unless IP is working
 	if (!net_status.configured) {
 		return;
 	}
 
-	// Copy the host name into RAM (stack)
-	char *host = alloca(strlen_P(syslog_server_name));
-	strcpy_P(host, syslog_server_name);
-
-	// Check if the lookup timer has expired
-	if (syslog_server != NULL &&
-		stimer_expired(&tmr_lookup))
-	{
-		syslog_server = NULL;
-	}
-	// Check if we need to lookup the IP in the resolver's table
-	else if (syslog_server == NULL &&
-		!stimer_expired(&tmr_lookup))
-	{
-		syslog_server = resolv_lookup(host);
-		// FIXME: host not found
-		if (!syslog_server) {
-			return;
-		}
-	}
-
-	// Start a lookup if we need to
-	if (syslog_server == NULL) {
-		resolv_query(host);
+	// Let's see if we have some messages
+	if (!list_head(msgq)) {
 		return;
 	}
 
-	if (conn != NULL &&
-		!uip_ipaddr_cmp(&conn->ripaddr, syslog_server))
-	{
-		uip_udp_remove(conn);
-		conn = NULL;
-	}
+	// Set up or update connection
+	check_connection();
 
-	// Check if we need to set up the connection
+	// Make sure the connection is set up
 	if (conn == NULL) {
-		conn = udp_new(syslog_server, UIP_HTONS(SYSLOG_PORT), NULL);
-		if (!conn) {
-			return;
-		}
-
-		udp_bind(conn, UIP_HTONS(SYSLOG_PORT));
-
-		tcpip_poll_udp(conn);
-		return; // don't send packet as soon as we create conn?
+		return;
 	}
 
 	// Send a message
@@ -320,11 +339,7 @@ static void lookup_and_send(void) {
 	if (msg) {
 		send_message(msg);
 		free(msg);
-
-		if (list_head(msgq)) {
-			// We have more messages to send
-			tcpip_poll_udp(conn);
-		}
+		poll_if_required();
 	}
 }
 
@@ -337,14 +352,22 @@ PROCESS_THREAD(syslog_process, ev, data) {
 	while (1) {
 		PROCESS_WAIT_EVENT();
 
-		if (ev == tcpip_event) {
-			if (uip_udp_conn == conn || conn == NULL) {
-				lookup_and_send();
+		// Call the resolver
+		resolv_helper_appcall(&res, ev, data);
+
+		if (ev == PROCESS_EVENT_POLL) {
+			check_connection();
+			if (conn) {
+				tcpip_poll_udp(conn);
+			}
+			else {
+				poll_if_required();
 			}
 		}
-		else if (ev == resolv_event_found) {
-			stimer_set(&tmr_lookup, SYSLOG_DNS_TTL);
-			lookup_and_send();
+		else if (ev == tcpip_event) {
+			if (uip_udp_conn == conn) {
+				send_messages();
+			}
 		}
 		else if (ev == PROCESS_EVENT_EXIT) {
 			process_exit(&syslog_process);

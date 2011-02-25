@@ -28,6 +28,8 @@
 
 #include <time.h>
 #include <sntp.h>
+#include <resolv_helper.h>
+
 #if CONFIG_DRIVERS_DS1307
 #include "drivers/ds1307.h"
 #endif
@@ -46,10 +48,9 @@ INIT_PROCESS(timesync_process);
 timesync_status_t timesync_status;
 process_event_t timesync_event;
 
-static uip_ipaddr_t *sntp_server = NULL;
+static struct resolv_helper_status res;
 static struct etimer tmr_periodic;
 static struct stimer tmr_resync;
-static struct stimer tmr_lookup;
 
 static int init(void) {
 #if CONFIG_DRIVERS_DS1307
@@ -86,36 +87,33 @@ static int init(void) {
 	wallclock_set(&new);
 #endif
 
+	// Copy the host name into the resolv helper structure
+	strncpy_P(res.name, sntp_server_name, sizeof(res.name));
+
+	// Launch the lookup
+	resolv_helper_lookup(&res);
+
 	return 0;
 }
 
 static void sntp_lookup_sync(void) {
-	// Copy the host name into RAM (stack)
-	char *host = alloca(strlen_P(sntp_server_name));
-	strcpy_P(host, sntp_server_name);
-
-	// Check if the lookup timer has expired
-	if (sntp_server != NULL &&
-		stimer_expired(&tmr_lookup))
-	{
-		// Yep, clear the IP address
-		sntp_server = NULL;
+	if (res.state == RESOLV_HELPER_STATE_DONE) {
+		sntp_sync(res.ipaddr);
+		timesync_status.sync_pending = 0;
+		return; // no poll
 	}
-	// Check if we need to lookup the IP in the resolver's table
-	else if (sntp_server == NULL &&
-		!stimer_expired(&tmr_lookup))
-	{
-		sntp_server = resolv_lookup(host);
+	else if (res.state == RESOLV_HELPER_STATE_EXPIRED) {
+		// Refresh the expired lookup
+		resolv_helper_lookup(&res);
+	}
+	else if (res.state == RESOLV_HELPER_STATE_ERROR) {
+		syslog_P(LOG_DAEMON | LOG_ERR,
+			PSTR("SNTP host lookup error: %s"),
+			res.name);
+		return; // no poll
 	}
 
-	// Perform a sync if we have an IP
-	if (sntp_server != NULL) {
-		sntp_sync(*sntp_server);
-	}
-	// Otherwise start a lookup
-	else {
-		resolv_query(host);
-	}
+	process_poll(&timesync_process);
 }
 
 PROCESS_THREAD(timesync_process, ev, data) {
@@ -127,7 +125,13 @@ PROCESS_THREAD(timesync_process, ev, data) {
 	while (1) {
 		PROCESS_WAIT_EVENT();
 
-		if (ev == tcpip_event) {
+		// Call the resolver
+		resolv_helper_appcall(&res, ev, data);
+
+		if (ev == PROCESS_EVENT_POLL) {
+			sntp_lookup_sync();
+		}
+		else if (ev == tcpip_event) {
 			if (timesync_status.running) {
 				sntp_appcall(ev, data);
 			}
@@ -135,6 +139,7 @@ PROCESS_THREAD(timesync_process, ev, data) {
 		else if (ev == net_event) {
 			if (net_status.configured && !timesync_status.running) {
 				timesync_status.running = 1;
+				timesync_status.sync_pending = 1;
 				timesync_status.synchronised = 0;
 
 				etimer_set(&tmr_periodic, CLOCK_SECOND);
@@ -144,12 +149,12 @@ PROCESS_THREAD(timesync_process, ev, data) {
 					&timesync_status);
 				syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Starting"));
 
-				sntp_lookup_sync();
+				process_poll(&timesync_process);
 			}
 			else if (!net_status.configured && timesync_status.running) {
 				timesync_status.running = 0;
+				timesync_status.sync_pending = 0;
 				timesync_status.synchronised = 0;
-				sntp_server = NULL;
 
 				etimer_stop(&tmr_periodic);
 
@@ -165,19 +170,17 @@ PROCESS_THREAD(timesync_process, ev, data) {
 				if (timesync_status.running && stimer_expired(&tmr_resync)) {
 					stimer_reset(&tmr_resync);
 
-					sntp_lookup_sync();
+					timesync_status.sync_pending = 1;
+					process_poll(&timesync_process);
 				}
 			}
 			else if (timesync_status.running) {
 				sntp_appcall(ev, data);
 			}
 		}
-		else if (ev == resolv_event_found) {
-			stimer_set(&tmr_lookup, SNTP_DNS_TTL);
-			sntp_lookup_sync();
-		}
 		else if (ev == PROCESS_EVENT_EXIT) {
 			timesync_status.running = 0;
+			timesync_status.sync_pending = 0;
 			timesync_status.synchronised = 0;
 
 #if CONFIG_DRIVERS_DS1307
