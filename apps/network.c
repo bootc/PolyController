@@ -18,8 +18,10 @@
  * MA 02110-1301, USA.
  */
 
+#define TCPDUMP 0
+#define TCPDUMP_RAWPKT 0
+
 #include <contiki-net.h>
-#include <net/tcpdump.h>
 #include <sys/log.h>
 #include <init.h>
 
@@ -45,8 +47,10 @@
 #include "apps/syslog.h"
 #endif
 
-#define TCPDUMP 0
-#define TCPDUMP_RAWPKT 0
+#ifdef TCPDUMP
+#include <net/tcpdump.h>
+#endif
+
 #define BUF ((struct uip_eth_hdr *)&uip_buf[0])
 #define IPBUF ((struct uip_tcpip_hdr *)&uip_buf[UIP_LLH_LEN])
 
@@ -70,11 +74,11 @@ INIT_PROCESS(tcpip_process);
 static void tcpdump(uint8_t *pkt, uint16_t len) {
 	char prt[41];
 
-	if (((struct uip_eth_hdr *)pkt)->type == uip_htons(UIP_ETHTYPE_IP)) {
+	if (((struct uip_eth_hdr *)pkt)->type == UIP_HTONS(UIP_ETHTYPE_IP)) {
 		tcpdump_format(pkt + 14, len - 14, prt, sizeof(prt));
 		printf_P(PSTR("%s\n"), prt);
 	}
-	else if (((struct uip_eth_hdr *)pkt)->type == uip_htons(UIP_ETHTYPE_ARP)) {
+	else if (((struct uip_eth_hdr *)pkt)->type == UIP_HTONS(UIP_ETHTYPE_ARP)) {
 		printf_P(PSTR("ARP\n"));
 	}
 	else {
