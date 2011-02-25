@@ -27,7 +27,6 @@
 #include "apps/timesync.h"
 
 #include <time.h>
-#include <strftime.h>
 #include <avr/pgmspace.h>
 
 PROCESS(shell_date_process, "date");

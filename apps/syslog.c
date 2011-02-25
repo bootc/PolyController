@@ -31,7 +31,6 @@
 #include <drivers/wallclock.h>
 #include <init.h>
 #include <time.h>
-#include <strftime.h>
 
 #include "apps/network.h"
 

@@ -53,16 +53,12 @@
  *
  */
 
-#include "net/tcpip.h"
-#include "net/resolv.h"
+#include <contiki-net.h>
+#include "resolv.h"
 #if UIP_UDP
 
 #include <init.h>
 #include <string.h>
-
-#ifndef NULL
-#define NULL (void *)0
-#endif /* NULL */
 
 #if UIP_CONF_IPV6
 

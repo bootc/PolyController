@@ -109,8 +109,11 @@ static char *_yconv(int, int, int, int, char *, const char *);
 
 static PGM_P _idx(PGM_P arr, int idx);
 
-size_t strftime_P(char *const s, const size_t maxsize,
-	PGM_P format, const struct tm *const t)
+size_t strftime_P(
+	char *s,
+	size_t maxsize,
+	PGM_P format,
+	const struct tm *t)
 {
 	char *p;
 
