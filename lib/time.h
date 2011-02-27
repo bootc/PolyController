@@ -21,6 +21,8 @@
 #ifndef TIME_H_
 #define TIME_H_
 
+#include <avr/pgmspace.h>
+
 typedef int32_t time_t;
 
 struct tm {
