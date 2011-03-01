@@ -76,7 +76,7 @@ PROCESS_THREAD(shell_free_process, ev, data) {
 
 	// Heap memory (malloc area)
 	static const uint16_t heap_start = (uint16_t)&__heap_start;
-	const uint16_t heap_end = (uint16_t)MAX(&__heap_end, (char *)__brkval) - 1;
+	const uint16_t heap_end = (uint16_t)MAX(&__heap_start, (char *)__brkval) - 1;
 	const uint16_t heap_free = walk_freelist();
 
 	// Stack memory
@@ -90,19 +90,19 @@ PROCESS_THREAD(shell_free_process, ev, data) {
 
 	// Static memory
 	shell_output_P(&shell_free_command,
-		PSTR("Static:     %4u           -           -"),
+		PSTR("Static:    %5u           -           -"),
 		static_end - static_start + 1);
 
 	// Heap memory
 	shell_output_P(&shell_free_command,
-		PSTR("Heap:       %4d        %4d        %4d"),
+		PSTR("Heap:      %5u       %5u       %5u"),
 		heap_end - heap_start + 1,
 		heap_end - heap_start + 1 - heap_free,
 		heap_free);
 
 	// Stack memory
 	shell_output_P(&shell_free_command,
-		PSTR("Stack:      %4d        %4d        %4d"),
+		PSTR("Stack:     %5u       %5u       %5u"),
 		stack_end - stack_start + 1,
 		stack_end - stack_start + 1 - stack_free,
 		stack_free);
@@ -110,7 +110,7 @@ PROCESS_THREAD(shell_free_process, ev, data) {
 #if PROCESS_CONF_STATS
 	// Process event stats
 	shell_output_P(&shell_free_command, PSTR(""));
-	shell_output_P(&shell_free_command, PSTR("Max Events: %d"),
+	shell_output_P(&shell_free_command, PSTR("Max Events: %u"),
 		process_maxevents);
 #endif
 
