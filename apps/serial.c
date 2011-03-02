@@ -32,6 +32,19 @@
 PROCESS(serial_process, "Serial");
 INIT_PROCESS(serial_process);
 
+static int serial_putc(char c, FILE *stream) {
+	if (c == '\n') {
+		uart_putc('\r');
+	}
+
+	uart_putc(c);
+
+	return 0;
+}
+
+static FILE uart_stream =
+    FDEV_SETUP_STREAM(serial_putc, NULL, _FDEV_SETUP_WRITE);
+
 static void serial_init(void) {
 #define BAUD CONFIG_UART0_BAUD
 #include <util/setbaud.h>
@@ -49,6 +62,8 @@ static void serial_init(void) {
 		(UBRRL_VALUE << 0) |
 		(USE_2X ? 0x8000 : 0));
 #endif
+
+    stdout = &uart_stream;
 }
 
 static void pollhandler(void) {
@@ -76,27 +91,12 @@ static void pollhandler(void) {
 	};
 }
 
-static int serial_putc(char c, FILE *stream) {
-	if (c == '\n') {
-		uart_putc('\r');
-	}
-
-	uart_putc(c);
-
-	return 0;
-}
-
-static FILE uart_stream =
-    FDEV_SETUP_STREAM(serial_putc, NULL, _FDEV_SETUP_WRITE);
-
 PROCESS_THREAD(serial_process, ev, data) {
 	PROCESS_POLLHANDLER(pollhandler());
 	PROCESS_BEGIN();
 
-	serial_init();
 	serial_line_init();
 
-    stdout = &uart_stream;
 	process_poll(&serial_process);
 
 	PROCESS_WAIT_UNTIL(ev == PROCESS_EVENT_EXIT);
@@ -104,3 +104,4 @@ PROCESS_THREAD(serial_process, ev, data) {
 	PROCESS_END();
 }
 
+INIT_DRIVER(serial, serial_init);
