@@ -18,6 +18,7 @@
  * MA 02110-1301, USA.
  */
 
+#include <stdio.h>
 #include <contiki-net.h>
 #include <init.h>
 #include "monitor.h"
@@ -36,6 +37,12 @@ PROCESS_THREAD(monitor_process, ev, data) {
 
 	// Initialise timer
 	etimer_set(&heartbeat, CLOCK_SECOND / 2);
+
+	// Print boot message
+	printf_P(PSTR("\n\n\n"));
+	printf_P(PSTR("PolyController " CONFIG_BOARD "\n"));
+	printf_P(PSTR("Image: " CONFIG_IMAGE "\n"));
+	printf_P(PSTR("\n"));
 
 	while (1) {
 		PROCESS_WAIT_EVENT();
