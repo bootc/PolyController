@@ -91,12 +91,8 @@ void board_init(void) {
 		_BV(PINC7);
 
 	/* Port D */
-	DDRD =
-		_BV(PIND1) |
-		_BV(PIND3);
+	DDRD = 0x00;
 	PORTD =
-		_BV(PIND0) |
-		_BV(PIND2) |
 		_BV(PIND4) |
 		_BV(PIND5) |
 		_BV(PIND6) |
