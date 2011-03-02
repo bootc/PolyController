@@ -22,36 +22,14 @@
 #include <init.h>
 #include "monitor.h"
 
-//#include <stdio.h>
-//#include <avr/pgmspace.h>
-
-#if CONFIG_APPS_DHCP
-#include "dhcp.h"
+#if CONFIG_APPS_NETWORK
+#include "network.h"
 #endif
-//#include "shell/shell.h"
-
-#include "drivers/wallclock.h"
 
 PROCESS(monitor_process, "Monitor");
 INIT_PROCESS(monitor_process);
 
 static struct etimer heartbeat;
-
-/*
-static void log_message_P(PGM_P fmt, ...) {
-	va_list argp;
-
-	printf_P(PSTR("\r\x1b[2K\x1b[01;32m"));
-
-	va_start(argp, fmt);
-	vfprintf_P(stdout, fmt, argp);
-	va_end(argp);
-
-	printf_P(PSTR("\x1b[00m\n"));
-
-	shell_prompt_P(PSTR("Contiki> "));
-}
-*/
 
 PROCESS_THREAD(monitor_process, ev, data) {
 	PROCESS_BEGIN();
@@ -62,13 +40,13 @@ PROCESS_THREAD(monitor_process, ev, data) {
 	while (1) {
 		PROCESS_WAIT_EVENT();
 
-#if CONFIG_APPS_DHCP
-		if (ev == dhcp_event) {
-			if (dhcp_status.configured) {
-				PORTD |= _BV(PIND7);
+#if CONFIG_APPS_NETWORK
+		if (ev == net_event) {
+			if (net_status.configured) {
+				PORTA |= _BV(PINA1);
 			}
 			else {
-				PORTD &= ~_BV(PIND7);
+				PORTA &= ~_BV(PINA1);
 			}
 		}
 		else
@@ -80,7 +58,7 @@ PROCESS_THREAD(monitor_process, ev, data) {
 				etimer_restart(&heartbeat);
 
 				// Toggle heartbeat LED
-				PORTD ^= _BV(PIND6);
+				PORTA ^= _BV(PINA0);
 			}
 		}
 		else if (ev == PROCESS_EVENT_EXIT) {
