@@ -41,8 +41,8 @@
 
 struct ds1307_raw {
 	/* 0x00: Seconds */
-	uint8_t ch : 1;
 	uint8_t sec : 7;
+	uint8_t ch : 1;
 
 	/* 0x01: Minutes */
 	uint8_t min;
@@ -247,9 +247,9 @@ int ds1307_clock_get(struct tm *tm) {
 	tm->tm_min = bcd2dec(raw.min);
 	// hour is done below
 	tm->tm_mday = bcd2dec(raw.mday);
-	tm->tm_mon = bcd2dec(raw.mon - 1);
-	tm->tm_year = bcd2dec(raw.year + 100); // we assume a century of 2000
-	tm->tm_wday = bcd2dec(raw.wday - 1);
+	tm->tm_mon = bcd2dec(raw.mon) - 1;
+	tm->tm_year = bcd2dec(raw.year) + 100; // we assume a century of 2000
+	tm->tm_wday = bcd2dec(raw.wday) - 1;
 
 	// Convert hours, taking into account 12-hour mode
 	if (raw.hour & HOUR_12) {
