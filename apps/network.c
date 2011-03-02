@@ -183,16 +183,16 @@ static uint8_t network_send_tcpip(void) {
 #endif
 
 static void network_init(void) {
+	struct uip_eth_addr macaddr;
+
 	net_event = process_alloc_event();
 
 #if CONFIG_DRIVERS_ENC28J60
 	// Set our MAC address
-	struct uip_eth_addr local_mac;
-	memcpy_P(&local_mac, &mac, sizeof(mac));
-	uip_setethaddr(local_mac);
+	memcpy_P(&macaddr, &mac, sizeof(mac));
 
 	// Set up ethernet
-	enc28j60Init(&local_mac);
+	enc28j60Init(&macaddr);
 	enc28j60Write(ECOCON, 0 & 0x7); // Disable clock output
 	_delay_ms(10);
 
@@ -218,12 +218,17 @@ static void network_init(void) {
 	eidled &= 0x00ff; // and-out the high byte (LED config)
 	eidled |= EIDLED_LACFG1 | EIDLED_LBCFG2 | EIDLED_LBCFG1;
 	enc424j600WriteReg(EIDLED, eidled);
+
+	// Get the MAC address
+	enc424j600GetMACAddr(macaddr.addr);
 #endif
 
 #if !CONFIG_LIB_CONTIKI_IPV6
 	// Set up timers
 	timer_set(&arp_timer, CLOCK_SECOND * 10);
 #endif
+
+	uip_setethaddr(macaddr);
 }
 
 static void update_status(void) {
