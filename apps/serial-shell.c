@@ -65,10 +65,10 @@ void shell_default_output(PGM_P fmt, va_list args) {
 /*---------------------------------------------------------------------------*/
 void shell_prompt_P(PGM_P str) {
 #if CONFIG_LIB_CONTIKI_IPV6
-	printf_P(PSTR("\x1b[2K\x1b[01;34m%S\x1b[00m"),
+	printf_P(PSTR("\r\x1b[2K\x1b[01;34m%S\x1b[00m"),
 		str);
 #else
-	printf_P(PSTR("\x1b[2K\x1b[01;34m%d.%d: %S\x1b[00m"),
+	printf_P(PSTR("\r\x1b[2K\x1b[01;34m%d.%d: %S\x1b[00m"),
 		uip_hostaddr.u8[2], uip_hostaddr.u8[3], str);
 #endif
 }
