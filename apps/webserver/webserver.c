@@ -50,6 +50,7 @@ INIT_PROCESS(webserver_process);
 PROCESS_THREAD(webserver_process, ev, data) {
 	PROCESS_BEGIN();
 
+	process_start(&tcpip_process, NULL);
 	httpd_init();
 
 	while(1) {
