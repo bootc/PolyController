@@ -224,7 +224,7 @@ int timesync_set_time(const wallclock_time_t *time) {
 
 	// Tell folks about the change
 	process_post(PROCESS_BROADCAST, timesync_event, &timesync_status);
-	syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Clock adjusted by %lums"),
+	syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Clock adjusted by %ldms"),
 		diffms);
 
 #if CONFIG_DRIVERS_DS1307
