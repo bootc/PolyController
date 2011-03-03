@@ -89,6 +89,8 @@ static const char *states[] PROGMEM = {
 	running,
 	called};
 
+extern u16_t uip_listenports[UIP_LISTENPORTS];
+
 /*---------------------------------------------------------------------------*/
 PROCESS(shell_netstat_process, "netstat");
 SHELL_COMMAND(netstat_command,
@@ -130,6 +132,12 @@ PROCESS_THREAD(shell_netstat_process, ev, data)
 			udp->ripaddr.u8[2],
 			udp->ripaddr.u8[3],
 			uip_htons(udp->rport));
+	}
+
+	shell_output_P(&netstat_command, PSTR("Listen ports:"));
+	for (i = 0; i < UIP_LISTENPORTS; i++) {
+		shell_output_P(&netstat_command, PSTR("%d"),
+			UIP_HTONS(uip_listenports[i]));
 	}
 
 	PROCESS_END();
