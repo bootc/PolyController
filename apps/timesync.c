@@ -209,13 +209,23 @@ int timesync_set_time(const wallclock_time_t *time) {
 	struct tm tm;
 	uint32_t cur;
 #endif
+	wallclock_time_t oldtime;
+	int32_t diffms;
 
-	// First, update the wallclock
+	// Get the current wallclock time
+	wallclock_get(&oldtime);
+
+	// Update the wallclock
 	wallclock_set(time);
+
+	// Work out the time difference
+	diffms = ((int32_t)time->sec - (int32_t)oldtime.sec) * 1000;
+	diffms += (((int32_t)time->frac - (int32_t)oldtime.frac) * 1000) >> 12;
 
 	// Tell folks about the change
 	process_post(PROCESS_BROADCAST, timesync_event, &timesync_status);
-	syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Clock adjusted"));
+	syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Clock adjusted by %lums"),
+		diffms);
 
 #if CONFIG_DRIVERS_DS1307
 	// Get the current RTC time
@@ -234,6 +244,13 @@ int timesync_set_time(const wallclock_time_t *time) {
 		if (err) {
 			return err;
 		}
+
+		// Make sure the clock is running
+		ds1307_clock_start();
+		ds1307_ctl_set(DS1307_OUT_SQW_32768HZ);
+
+		syslog_P(LOG_DAEMON | LOG_INFO,
+			PSTR("RTC adjusted by %ds"), time->sec - cur);
 	}
 #endif
 
