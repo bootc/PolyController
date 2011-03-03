@@ -24,7 +24,7 @@
 #include "drivers/wallclock.h"
 
 // How often to refresh the local time offset (in seconds)
-#define SNTP_RESYNC_INTERVAL	1800
+#define SNTP_RESYNC_INTERVAL	1024 // same as ntpd once in sync
 
 typedef struct {
 	int running : 1;
