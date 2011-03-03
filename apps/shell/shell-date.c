@@ -68,9 +68,19 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 				PSTR("TimeSync not running."));
 		}
 	}
+	else if (strcmp_P(data, PSTR("--frac")) == 0) {
+		wallclock_time_t time;
+		wallclock_get(&time);
+
+		uint32_t ms = ((uint32_t)time.frac * 1000) >> 12;
+
+		shell_output_P(&shell_date_command,
+			PSTR("Fractional time (secs since epoch): %ld.%04lus"),
+			time.sec, ms);
+	}
 	else {
 		shell_output_P(&shell_date_command,
-			PSTR("Usage: date [--sync]"));
+			PSTR("Usage: date [--sync|--frac]"));
 	}
 
 	PROCESS_END();
