@@ -274,7 +274,7 @@ static void update_status(void) {
 		else {
 			syslog_P(
 				LOG_KERN | LOG_NOTICE,
-				PSTR("NET: Link DOWN"));
+				PSTR("Link DOWN"));
 		}
 #endif
 	}
