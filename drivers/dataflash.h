@@ -43,6 +43,15 @@ typedef struct {
 #define DATAFLASH_SREG_WEL 0x02
 #define DATAFLASH_SREG_BUSY 0x01
 
+#define DATAFLASH_WR_PAGE_SIZE ((uint32_t)1 << 8)
+#define DATAFLASH_WR_PAGE_MASK (~(DATAFLASH_WR_PAGE_SIZE - 1))
+#define DATAFLASH_SECTOR_4K_SIZE ((uint32_t)1 << 12)
+#define DATAFLASH_SECTOR_4K_MASK (~(DATAFLASH_SECTOR_4K_SIZE - 1))
+#define DATAFLASH_SECTOR_32K_SIZE ((uint32_t)1 << 15)
+#define DATAFLASH_SECTOR_32K_MASK (~(DATAFLASH_SECTOR_32K_SIZE - 1))
+#define DATAFLASH_SECTOR_64K_SIZE ((uint32_t)1 << 16)
+#define DATAFLASH_SECTOR_64K_MASK (~(DATAFLASH_SECTOR_64K_SIZE - 1))
+
 int dataflash_read_id(dataflash_id_t *id, uint8_t *extinfo, uint8_t bufsz);
 
 // For sector protection sectors only
@@ -66,7 +75,7 @@ int dataflash_erase_32k(uint32_t addr);
 int dataflash_erase_64k(uint32_t addr);
 int dataflash_erase_chip(void);
 
-int dataflash_write_data(void *buf, uint32_t addr, uint8_t bytes);
+int dataflash_write_data(const void *buf, uint32_t addr, uint16_t bytes);
 
 #endif /* DATAFLASH_H */
 

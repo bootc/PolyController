@@ -52,13 +52,6 @@
 // size of dataflash in bytes
 #define FLASH_SIZE 1048576
 
-#define WR_PAGE_SIZE ((uint32_t)1 << 8)
-#define WR_PAGE_MASK (~(WR_PAGE_SIZE - 1))
-#define SECTOR_32K_SIZE ((uint32_t)1 << 15)
-#define SECTOR_32K_MASK (~(SECTOR_32K_SIZE - 1))
-#define SECTOR_64K_SIZE ((uint32_t)1 << 16)
-#define SECTOR_64K_MASK (~(SECTOR_64K_SIZE - 1))
-
 static const dataflash_sector_t sectors[] PROGMEM = {
 	{ 0x00000, 0x0ffff }, //  0: 64K
 	{ 0x10000, 0x1ffff }, //  1: 64K
@@ -88,7 +81,7 @@ static struct {
 // Set up SPI and assert CS
 static inline void dev_assert(void) {
 	spi_init();
-	CONFIG_DRIVERS_DATAFLASH_PORT |= _BV(CONFIG_DRIVERS_DATAFLASH_CS);
+	CONFIG_DRIVERS_DATAFLASH_PORT &= ~_BV(CONFIG_DRIVERS_DATAFLASH_CS);
 }
 
 // Release CS and release SPI
@@ -111,7 +104,10 @@ static void dataflash_init(void) {
 
 	// read device ID
 	dataflash_id_t id;
-	dataflash_read_id(&id, NULL, 0);
+	int ret = dataflash_read_id(&id, NULL, 0);
+	if (ret) {
+		return;
+	}
 
 	// check device ID matches what we expect
 	if ((id.num_cont != MFR_CT_ATMEL) ||
@@ -523,8 +519,8 @@ int dataflash_erase_4k(uint32_t addr) {
 int dataflash_erase_32k(uint32_t addr) {
 	int err;
 	uint8_t temp;
-	uint32_t start = addr & SECTOR_32K_MASK;
-	uint32_t end = start + SECTOR_32K_SIZE;
+	uint32_t start = addr & DATAFLASH_SECTOR_32K_MASK;
+	uint32_t end = start + DATAFLASH_SECTOR_32K_SIZE;
 	dataflash_sector_t sector;
 
 	// Make sure init has been called
@@ -589,8 +585,8 @@ int dataflash_erase_32k(uint32_t addr) {
 int dataflash_erase_64k(uint32_t addr) {
 	int err;
 	uint8_t temp;
-	uint32_t start = addr & SECTOR_64K_MASK;
-	uint32_t end = start + SECTOR_64K_SIZE;
+	uint32_t start = addr & DATAFLASH_SECTOR_64K_MASK;
+	uint32_t end = start + DATAFLASH_SECTOR_64K_SIZE;
 	dataflash_sector_t sector;
 
 	// Make sure init has been called
@@ -690,10 +686,10 @@ int dataflash_erase_chip(void) {
 	return 0;
 }
 
-int dataflash_write_data(void *buf, uint32_t addr, uint8_t bytes) {
+int dataflash_write_data(const void *buf, uint32_t addr, uint16_t bytes) {
 	uint8_t *cbuf = (uint8_t *)buf;
-	uint32_t page_start = addr & WR_PAGE_MASK;
-	uint32_t page_end = page_start + WR_PAGE_SIZE;
+	uint32_t page_start = addr & DATAFLASH_WR_PAGE_MASK;
+	uint32_t page_end = page_start + DATAFLASH_WR_PAGE_SIZE;
 	int err;
 	uint8_t temp;
 
