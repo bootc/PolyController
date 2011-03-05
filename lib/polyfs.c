@@ -158,8 +158,9 @@ int32_t polyfs_fread(polyfs_fs_t *fs, const struct polyfs_inode *inode,
 	}
 
 	// Check we aren't trying to read past the end of the file
-	if (offset >= inode->size) {
-		PRINTF1("offset is too large\n");
+	if (offset > inode->size) {
+		PRINTF("offset is too large (%lu >= %lu)\n",
+			offset, inode->size);
 		return -1;
 	}
 
@@ -167,6 +168,10 @@ int32_t polyfs_fread(polyfs_fs_t *fs, const struct polyfs_inode *inode,
 	if (offset + read_bytes > inode->size) {
 		// reduce the requested read size
 		read_bytes = inode->size - offset;
+	}
+
+	if (read_bytes == 0) {
+		return 0;
 	}
 
 	// We need to read from a block that's not the first
