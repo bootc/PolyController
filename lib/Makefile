@@ -14,6 +14,7 @@ $(curdir)-$(CONFIG_LIB_SETTINGS) += settings.c
 $(curdir)-$(CONFIG_LIB_SNTP) += sntp.c
 $(curdir)-$(CONFIG_LIB_STACK) += stack.c
 $(curdir)-$(CONFIG_LIB_STRFTIME) += strftime.c
+$(curdir)-$(CONFIG_LIB_TFTP) += tftp.c
 $(curdir)-$(CONFIG_LIB_TIME) += time.c
 
 $(eval $(call subdir,$(curdir)))
