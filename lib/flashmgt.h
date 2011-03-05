@@ -27,7 +27,7 @@ int flashmgt_sec_open(polyfs_fs_t *ptr);
 int flashmgt_sec_close(polyfs_fs_t *ptr);
 
 int flashmgt_sec_write_start(void);
-int flashmgt_sec_write_block(uint32_t offset, uint32_t len);
+int flashmgt_sec_write_block(const void *buf, uint32_t offset, uint32_t len);
 int flashmgt_sec_write_abort(void);
 int flashmgt_sec_write_finish(void);
 
