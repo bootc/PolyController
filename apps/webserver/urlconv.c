@@ -33,17 +33,17 @@
  * $Id: urlconv.c,v 1.4 2010-09-29 09:35:56 oliverschmidt Exp $
  */
 
+#include <stdint.h>
 #include <string.h>
+#include <stdio.h> // for debug only
+#include <avr/pgmspace.h>
 
-#include "cfs/cfs.h"
-#include "http-strings.h"
 #include "urlconv.h"
 
-#define ISO_number   0x23
-#define ISO_percent  0x25
-#define ISO_period   0x2e
-#define ISO_slash    0x2f
-#define ISO_question 0x3f
+#ifndef __AVR__
+#define PSTR(x) (x)
+#define printf_P(...) printf(__VA_ARGS__)
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* URL to filename conversion
@@ -51,97 +51,109 @@
  * normalizes path by removing "/./"
  * interprets "/../" and calculates path accordingly
  * resulting path is always absolute
+ * replaces multiple slashes with a single one
  * replaces "%AB" notation with characters
  * strips "#fragment" and "?query" from end
- * replaces multiple slashes with a single one
- * rejects non-ASCII characters
  *
  * MAXLEN is including trailing zero!
  * input and output is ASCII
  */
-void urlconv_tofilename(char *to, char *from, unsigned char maxlen) {
-	unsigned char len = 0;
-	unsigned char c, hex1;
+void urlconv_tofilename(char *out, const char *in, unsigned char maxlen) {
+	int idx = 0;
 
-	maxlen -= 2; // ??
-
-	do {
-		c = *(from++);
-
-		switch(c) {
-			case ISO_number:
-			case ISO_question:
-				c = 0;
-				break;
-
-			case ISO_percent:
-				c = 0;
-				hex1 = (*(from++) | 0x20) ^ 0x30;  // ascii only!
-
-				if (hex1 > 0x50 && hex1 < 0x57)
-					hex1 -= 0x47;
-				else if (hex1 > 9)
-					break;  // invalid hex
-
-				c = (*(from++) | 0x20) ^ 0x30;  // ascii only!
-
-				if (c > 0x50 && c < 0x57)
-					c -= 0x47;
-				else if (c > 9)
-					break;  // invalid hex
-
-				c |= hex1 << 4;
-		}
-
-		if (c < 0x20 || c > 0x7e)
-			c = 0;  // non ascii?!
-
-		if (len >= maxlen)
-			c = 0;  // too long?
-
-		if (c == ISO_slash || !c) {
-			switch (*to) {
-				case ISO_slash:
-					continue;  // no repeated slash
-
-				case ISO_period:
-					switch (to[-1]) {
-						case ISO_slash:  // handle "./" 
-							--to;
-							--len;
-							continue;
-
-						case ISO_period:
-							if (to[-2] == ISO_slash) {
-								to -= 2;
-								len -= 2;
-
-								if (len) {
-									do {
-										--to;
-										--len;
-									} while (*to != ISO_slash && len);
-								}
-
-								continue;
-							}
-					}
-			}
-		}
-
-		if (c) {
-			++to;
-			++len; 
-			*to = c;
-		}
-	} while(c);
-
-	if (*to == ISO_slash && (len + sizeof(http_index_html) - 3) < maxlen) {
-		strcpy_P(to, http_index_html);  // add index.htm
+	if (maxlen == 0) {
+		return;
 	}
 	else {
-		++to;
-		*to = 0;
+		maxlen--;
 	}
+
+	printf_P(PSTR("IN:%s "), in);
+
+	// Output path is always absolute
+	out[idx++] = '/';
+
+	while (*in && idx <= maxlen) {
+		int len;
+
+		// Work out the length of this path element
+		char *term = strchrnul(in, '/');
+		len = term - in;
+
+		if (len == 0 || (len == 1 && in[0] == '.')) {
+			// noop segment (/ or ./) so skip it
+		}
+		else if (len == 2 && in[0] == '.' && in[1] == '.') {
+			// backpath (../)
+
+			if (idx == 1) {
+				// attempt to move above root (noop)
+			}
+			else {
+				// crop the prior segment
+				do {
+					--idx;
+				} while (idx && out[idx - 1] != '/');
+			}
+		}
+		else {
+			// An actual segment, append it to the destination path
+
+			if (*term) {
+				len++;
+			}
+
+			int i;
+			for (i = 0; i < len; i++) {
+				if (idx >= maxlen) {
+					break;
+				}
+				else if (in[i] == '%') {
+					char c;
+					uint8_t hex1 = (in[++i] | 0x20) ^ 0x30;  // ascii only!
+
+					if (hex1 > 0x50 && hex1 < 0x57)
+						hex1 -= 0x47;
+					else if (hex1 > 9)
+						break;  // invalid hex
+
+					c = (in[++i] | 0x20) ^ 0x30;  // ascii only!
+
+					if (c > 0x50 && c < 0x57)
+						c -= 0x47;
+					else if (c > 9)
+						break;  // invalid hex
+
+					c |= hex1 << 4;
+
+					out[idx++] = c;
+				}
+				else if (in[i] == '#' || in[i] == '?') {
+					break;
+				}
+				else {
+					out[idx++] = in[i];
+				}
+			}
+
+			if (i != len) {
+				break;
+			}
+
+			//memcpy(&out[idx], in, len);
+			//idx += len;
+		}
+
+		// Skip to the next path segment
+		if (*term) {
+			term++;
+		}
+		in = term;
+	}
+
+	// Null terminate the output
+	out[idx] = '\0';
+
+	printf_P(PSTR("OUT:%s\n"), out);
 }
 

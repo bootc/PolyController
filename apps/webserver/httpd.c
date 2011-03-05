@@ -107,6 +107,12 @@ static PT_THREAD(send_file(struct httpd_state *s)) {
 		if (s->len > 0) {
 			s->fpos += s->len;
 		}
+
+		// Check if we've reached the end of file
+		cfs_offset_t len = cfs_seek(s->fd, 0, CFS_SEEK_END);
+		if (s->fpos >= len) {
+			break;
+		}
 	} while(s->len > 0);
 
 	PSOCK_END(&s->sout);
@@ -378,16 +384,23 @@ static PT_THREAD(handle_input(struct httpd_state *s)) {
 		PSOCK_CLOSE_EXIT(&s->sin);
 	}
 
-	if (s->inputbuf[1] == ISO_space) {
-		strncpy_P(s->filename, http_index_html, sizeof(s->filename));
-	}
-	else {
-		s->inputbuf[PSOCK_DATALEN(&s->sin) - 1] = 0;
-		//strncpy(s->filename, (char *)s->inputbuf, sizeof(s->filename));
+	// null-terminate the path string
+	s->inputbuf[PSOCK_DATALEN(&s->sin) - 1] = 0;
 
-		strcpy_P(s->filename, PSTR("/www"));
-		int idx = strlen(s->filename);
-		urlconv_tofilename(&s->filename[idx], (char *)s->inputbuf, sizeof(s->filename) - idx);
+	// prefix the path with '/www'
+	strcpy_P(s->filename, PSTR("/www"));
+
+	// Use urlconv to sanitise the path
+	int idx = strlen(s->filename);
+	urlconv_tofilename(&s->filename[idx], (char *)s->inputbuf,
+		sizeof(s->filename) - idx);
+
+	// Append 'index.html' if necessary
+	idx = strlen(s->filename);
+	if (s->filename[idx - 1] == '/' &&
+		idx <= sizeof(s->filename) - sizeof(http_index_html))
+	{
+		strcpy_P(&s->filename[idx - 1], http_index_html);
 	}
 
 	webserver_log_file(&uip_conn->ripaddr, s->filename);
