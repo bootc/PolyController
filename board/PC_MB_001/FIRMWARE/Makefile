@@ -16,7 +16,11 @@ pfs: tools/polyfs $(TARGET).pfs
 
 $(BUILDDIR)/fsroot: $(IMAGE_DIR)/fsroot $(TARGET).bin
 	$(REMOVEDIR) "$(BUILDDIR)/fsroot"
-	rsync -a --exclude .svn "$(IMAGE_DIR)/fsroot/" "$(BUILDDIR)/fsroot/"
+	rsync -a \
+		--exclude .svn \
+		--exclude .*.swp \
+		--exclude .DS_Store --exclude ._* \
+		"$(IMAGE_DIR)/fsroot/" "$(BUILDDIR)/fsroot/"
 	cp $(TARGET).bin "$(BUILDDIR)"/fsroot/system.bin
 	touch "$(BUILDDIR)/fsroot"
 
