@@ -23,6 +23,9 @@
 
 #include <stdio.h>
 #include <avr/pgmspace.h>
+#if CONFIG_WATCHDOG
+#include <avr/wdt.h>
+#endif
 
 #include <init.h>
 #include <board.h>
@@ -40,7 +43,17 @@ int main(void) {
 	// Initialise everything else
 	init_doinit();
 
+#if CONFIG_WATCHDOG
+	// Set up the watchdog
+	wdt_enable(CONFIG_WATCHDOG_TIMEOUT);
+#endif
+
 	while (1) {
+#if CONFIG_WATCHDOG
+		// Poke the watchdog
+		wdt_reset();
+#endif
+
 		// Run processes
 		process_run();
 	}
