@@ -65,20 +65,12 @@ static int tftpupdate_iofunc(struct tftp_state *s, uint32_t offset,
 {
 	int err;
 
-	// Give the user some progress info
-	shell_output_P(&shell_tftpupdate_command, PSTR("..."));
-
 	// Write the flash block
 	err = flashmgt_sec_write_block(buf, offset, size);
 	if (err) {
 		shell_output_P(&shell_tftpupdate_command,
 			PSTR("Write error %d at block %d"),
 			err, s->block);
-	}
-	else {
-		shell_output_P(&shell_tftpupdate_command,
-			PSTR("Write bock %d OK"),
-			s->block);
 	}
 
 	return err;
@@ -170,12 +162,6 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 		}
 	}
 
-	// More user info
-	shell_output_P(&shell_tftpupdate_command,
-		PSTR("Requesting '%s' from %u.%u.%u.%u..."),
-		tftpupdate->filename,
-		uip_ipaddr_to_quad(&tftpupdate->res.ipaddr));
-
 	// Start the flash write
 	err = flashmgt_sec_write_start();
 	if (err) {
@@ -184,6 +170,12 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 		tftpupdate_cleanup();
 		PROCESS_EXIT();
 	}
+
+	// More user info
+	shell_output_P(&shell_tftpupdate_command,
+		PSTR("Requesting '%s' from %u.%u.%u.%u..."),
+		tftpupdate->filename,
+		uip_ipaddr_to_quad(&tftpupdate->res.ipaddr));
 
 	// Start the TFTP transfer
 	tftpupdate->s.addr = tftpupdate->res.ipaddr;
@@ -197,10 +189,6 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 			tftp_appcall(&tftpupdate->s);
 
 			if (tftpupdate->s.state == TFTP_STATE_CLOSE) {
-				shell_output_P(&shell_tftpupdate_command,
-					PSTR("Transfer finished (%lu bytes read)."),
-					tftpupdate->s.size);
-
 				// Send final ACK
 				PROCESS_WAIT_EVENT();
 				break;
@@ -239,6 +227,10 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 			err);
 	}
 	else {
+		shell_output_P(&shell_tftpupdate_command,
+				PSTR("Transfer finished (%lu bytes read)."),
+				tftpupdate->s.size);
+
 		shell_output_P(&shell_tftpupdate_command,
 			PSTR("New firmware image is in flash. "
 				"Please reboot to apply the upgrade."),

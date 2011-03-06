@@ -21,13 +21,31 @@
 #endif
 
 typedef struct {
-	uint8_t size_extra;
-	uint8_t size_low;
-	uint8_t size_check;
 	settings_key_t key;
+	uint16_t size;
+	uint8_t check;
 } item_header_t;
 
-static uint8_t settings_is_item_valid_(void *item_addr) {
+static uint8_t header_checkbyte(item_header_t *hdr) {
+	uint8_t *hdr2 = (uint8_t *)hdr;
+	uint8_t bytes = sizeof(*hdr) - 1;
+	uint8_t check = 0xb2; // random constant
+
+	while (bytes--) {
+		check ^= *hdr2++;
+	}
+
+	return check;
+}
+
+static inline void item_read_header(void *item, item_header_t *hdr) {
+	eeprom_read_block(
+		hdr,
+		(uint8_t *)item - sizeof(*hdr),
+		sizeof(*hdr));
+}
+
+static bool settings_is_item_valid_(void *item_addr) {
 	item_header_t header;
 
 	if (item_addr == NULL) {
@@ -37,12 +55,9 @@ static uint8_t settings_is_item_valid_(void *item_addr) {
 	//	if((SETTINGS_TOP_ADDR-item_addr)>=SETTINGS_MAX_SIZE-3)
 	//		return false;
 
-	eeprom_read_block(
-		&header,
-		(char *)item_addr + 1 - sizeof(header),
-		sizeof(header));
+	item_read_header(item_addr, &header);
 
-	if (header.size_check != ~header.size_low) {
+	if (header.check != header_checkbyte(&header)) {
 		return false;
 	}
 
@@ -54,12 +69,9 @@ static uint8_t settings_is_item_valid_(void *item_addr) {
 static settings_key_t settings_get_key_(void *item_addr) {
 	item_header_t header;
 
-	eeprom_read_block(
-		&header,
-		(char *)item_addr + 1 - sizeof(header),
-		sizeof(header));
+	item_read_header(item_addr, &header);
 
-	if (header.size_check != ~header.size_low) {
+	if (header.check != header_checkbyte(&header)) {
 		return SETTINGS_INVALID_KEY;
 	}
 
@@ -68,44 +80,39 @@ static settings_key_t settings_get_key_(void *item_addr) {
 
 static size_t settings_get_value_length_(void *item_addr) {
 	item_header_t header;
-	size_t ret = 0;
 
-	eeprom_read_block(
-		&header,
-		(char *)item_addr + 1 - sizeof(header),
-		sizeof(header));
+	item_read_header(item_addr, &header);
 
-	if (header.size_check != ~header.size_low) {
-		return ret;
+	if (header.check != header_checkbyte(&header)) {
+		printf_P(PSTR("header checkbyte fail\n"));
+		return 0;
 	}
 
-	ret = header.size_low;
-
-	if (ret & (1 << 7)) {
-		ret = ((ret & ~(1 << 7)) << 8) | header.size_extra;
-	}
-
-	return ret;
+	return header.size;
 }
 
 static void *settings_get_value_addr_(void *item_addr) {
 	size_t len = settings_get_value_length_(item_addr);
 
-	if (len > 128) {
-		return (char *)item_addr + 1 - sizeof(item_header_t) - len;
+	if (!len) {
+		return NULL;
 	}
-	else {
-		return (char *)item_addr + 1 - sizeof(item_header_t) + 1 - len;
-	}
+
+	return (uint8_t *)item_addr - (sizeof(item_header_t) + len);
 }
 
 static inline void *settings_next_item_(void *item_addr) {
-	return (char *)settings_get_value_addr_(item_addr) - 1;
+	void *value_addr = settings_get_value_addr_(item_addr);
+
+	if (!value_addr) {
+		return NULL;
+	}
+
+	return (uint8_t *)value_addr - 1;
 }
 
 bool settings_check(settings_key_t key, uint8_t index) {
-	bool ret = false;
-	void *current_item = SETTINGS_TOP_ADDR;
+	void *current_item;
 
 	for (current_item = SETTINGS_TOP_ADDR;
 		settings_is_item_valid_(current_item);
@@ -118,13 +125,13 @@ bool settings_check(settings_key_t key, uint8_t index) {
 		}
 	}
 
-	return ret;
+	return false;
 }
 
 settings_status_t settings_get(settings_key_t key, uint8_t index,
 	void *value, size_t *value_size)
 {
-	void *current_item = SETTINGS_TOP_ADDR;
+	void *current_item;
 
 	for (current_item = SETTINGS_TOP_ADDR;
 		settings_is_item_valid_(current_item);
@@ -152,7 +159,7 @@ settings_status_t settings_get(settings_key_t key, uint8_t index,
 settings_status_t settings_add(settings_key_t key,
 	const void *value, size_t value_size)
 {
-	void *current_item = SETTINGS_TOP_ADDR;
+	void *current_item;
 	item_header_t header;
 
 	// Find end of list
@@ -161,44 +168,27 @@ settings_status_t settings_add(settings_key_t key,
 		current_item = settings_next_item_(current_item));
 
 	if (current_item == NULL) {
+		printf_P(PSTR("current_item == NULL\n"));
 		return SETTINGS_STATUS_FAILURE;
 	}
 
 	// TODO: size check!
 
 	header.key = key;
-
-	if (value_size < 0x80) {
-		// If the value size is less than 128, then
-		// we can get away with only using one byte
-		// as the size.
-		header.size_low = value_size;
-	}
-	else if (value_size <= SETTINGS_MAX_VALUE_SIZE) {
-		// If the value size of larger than 128,
-		// then we need to use two bytes. Store
-		// the most significant 7 bits in the first
-		// size byte (with MSB set) and store the
-		// least significant bits in the second
-		// byte (with LSB clear)
-		header.size_low = (value_size>>7) | 0x80;		
-		header.size_extra = value_size & ~0x80;
-	}
-	else {
-		// Value size too big!
-		return SETTINGS_STATUS_FAILURE;
-	}
-
-	header.size_check = ~header.size_low;
+	header.size = value_size;
+	header.check = header_checkbyte(&header);
 
 	// Write the header first
-	eeprom_update_block(
+	eeprom_write_block(
 		&header,
-		(char *)current_item + 1 - sizeof(header),
+		(char *)current_item - sizeof(header),
 		sizeof(header));
 
 	// Sanity check, remove once confident
-	if (settings_get_value_length_(current_item) != value_size) {
+	size_t checksize = settings_get_value_length_(current_item);
+	if (checksize != value_size) {
+		printf_P(PSTR("sanity check fail (%u != %u) 0x%04x\n"),
+			checksize, value_size, current_item);
 		return SETTINGS_STATUS_FAILURE;
 	}
 
@@ -214,7 +204,7 @@ settings_status_t settings_add(settings_key_t key,
 settings_status_t settings_set(settings_key_t key,
 	const void *value, size_t value_size)
 {
-	void *current_item = SETTINGS_TOP_ADDR;
+	void *current_item;
 
 	for (current_item = SETTINGS_TOP_ADDR;
 		settings_is_item_valid_(current_item);

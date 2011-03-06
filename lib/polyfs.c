@@ -89,14 +89,14 @@ int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
 	uint32_t crc = crc32(0, NULL, 0);
 	uint32_t size = 0;
 	uint32_t read_crc = 0;
-	int length = 0;
+	uint32_t length = 0;
 	int ret;
 
 	while (1) {
 		// Read a block of FS data
 		ret = read_storage(fs, temp, length, tempsize);
 		if (ret < 0) {
-			return -1;
+			return ret;
 		}
 		else if (ret == 0) {
 			break;
@@ -105,11 +105,11 @@ int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
 		// If we've just read the superblock, extract some info
 		if (length == 0) {
 			struct polyfs_super *super = (struct polyfs_super *)temp;
-			size = super->size;
-			read_crc = super->fsid.crc;
+			size = POLYFS_32(super->size);
+			read_crc = POLYFS_32(super->fsid.crc);
 
 			// Wipe the CRC from the block we read so the calculation is valid
-			super->fsid.crc = crc32(0, NULL, 0);
+			super->fsid.crc = POLYFS_32(crc32(0, NULL, 0));
 		}
 
 		length += ret;

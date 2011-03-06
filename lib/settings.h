@@ -15,11 +15,8 @@ typedef enum {
 	SETTINGS_STATUS_FAILURE,
 } settings_status_t;
 
-#define SETTINGS_BASE_NETWORKING	(0x01 << 8)
-#define SETTINGS_BASE_NTP			(0x02 << 8)
-#define SETTINGS_BASE_SYSLOG		(0x03 << 8)
+#define SETTINGS_KEY_FLASHMGT_STATUS	0x0100
 
-#define SETTINGS_LAST_INDEX		(0xFF)
 #define SETTINGS_INVALID_KEY	(0x00)
 #define SETTINGS_MAX_VALUE_SIZE	(0x3FFF)	// 16383 bytes
 

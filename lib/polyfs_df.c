@@ -115,6 +115,7 @@ int pfsdf_close(polyfs_fs_t *fs) {
 	// Clear up the info structure
 	struct pfsdf_info *iptr = fs->userptr;
 	iptr->offset = iptr->bytes = 0;
+	fs->userptr = fs->fn_read = NULL;
 
 	return 0;
 }
