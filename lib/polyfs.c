@@ -28,7 +28,10 @@
 
 #include "polyfs.h"
 
-#ifdef __AVR__
+#if !defined(CONFIG_LIB_POLYFS_DEBUG)
+#define PRINTF(fmt, ...)
+#define PRINTF1(fmt);
+#elif defined(__AVR__)
 #include <avr/pgmspace.h>
 #define PRINTF(fmt, ...) printf_P(PSTR(fmt), __VA_ARGS__)
 #define PRINTF1(fmt) printf_P(PSTR(fmt))
@@ -143,7 +146,7 @@ int32_t polyfs_fread(polyfs_fs_t *fs, const struct polyfs_inode *inode,
 	// the offset of the data section of this inode (start of block pointers)
 	uint32_t inode_offset = POLYFS_GET_OFFSET(inode) << 2;
 	// the block number that the offset falls into
-	uint32_t block = (offset + POLYFS_BLOCK_SIZE - 1) / POLYFS_BLOCK_SIZE;
+	uint32_t block = offset / POLYFS_BLOCK_SIZE;
 	// offset of the first block of data (block 0)
 	uint32_t start_offset = inode_offset + (blocks * 4);
 	// offset of the block pointer
