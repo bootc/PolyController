@@ -3,10 +3,8 @@
 #include <stdint.h>
 #include <avr/io.h>
 #include "settings.h"
-#include <stdio.h>
 #include <avr/eeprom.h>
 #include <avr/wdt.h>
-#include "contiki.h"
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 
@@ -84,7 +82,6 @@ static size_t settings_get_value_length_(void *item_addr) {
 	item_read_header(item_addr, &header);
 
 	if (header.check != header_checkbyte(&header)) {
-		printf_P(PSTR("header checkbyte fail\n"));
 		return 0;
 	}
 
@@ -168,7 +165,6 @@ settings_status_t settings_add(settings_key_t key,
 		current_item = settings_next_item_(current_item));
 
 	if (current_item == NULL) {
-		printf_P(PSTR("current_item == NULL\n"));
 		return SETTINGS_STATUS_FAILURE;
 	}
 
@@ -187,8 +183,6 @@ settings_status_t settings_add(settings_key_t key,
 	// Sanity check, remove once confident
 	size_t checksize = settings_get_value_length_(current_item);
 	if (checksize != value_size) {
-		printf_P(PSTR("sanity check fail (%u != %u) 0x%04x\n"),
-			checksize, value_size, current_item);
 		return SETTINGS_STATUS_FAILURE;
 	}
 
