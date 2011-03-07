@@ -26,16 +26,16 @@ extern polyfs_fs_t *flashmgt_pfs;
 int flashmgt_sec_open(polyfs_fs_t *ptr);
 int flashmgt_sec_close(polyfs_fs_t *ptr);
 
+#if !CONFIG_IMAGE_BOOTLOADER
 int flashmgt_sec_write_start(void);
 int flashmgt_sec_write_block(const void *buf, uint32_t offset, uint32_t len);
 int flashmgt_sec_write_abort(void);
 int flashmgt_sec_write_finish(void);
+#endif
 
 #if CONFIG_IMAGE_BOOTLOADER
-
-int flashmgt_check_pending(void);
-int flashmgt_swap_partitions(void);
-
+bool flashmgt_update_pending(void);
+int flashmgt_bootload(void);
 #endif
 
 #endif

@@ -18,11 +18,12 @@
  * MA 02110-1301, USA.
  */
 
-#include <contiki.h>
+#include <stdint.h>
 #include <polyfs.h>
 #include <polyfs_df.h>
+#if CONFIG_LIB_POLYFS_CFS
 #include <polyfs_cfs.h>
-#include <avr/eeprom.h>
+#endif
 #include <init.h>
 #include <settings.h>
 #include <string.h>
@@ -31,13 +32,27 @@
 #include <avr/wdt.h>
 #endif
 
-#include <stdio.h> // for debug only
+#if CONFIG_IMAGE_BOOTLOADER
+#include <avr/boot.h>
+#include <avr/interrupt.h>
+#endif
+
+#if !CONFIG_IMAGE_BOOTLOADER
+#include <avr/pgmspace.h>
+#include <stdio.h>
+#endif
 
 #include "drivers/dataflash.h"
 #include "flashmgt.h"
 
 // memory buffer used during CRC check
 #define CRC_BUFFER_SIZE 256
+
+// We use the same buffer for SPM in the bootloader
+#if CRC_BUFFER_SIZE < SPM_PAGESIZE && CONFIG_IMAGE_BOOTLOADER
+#undef CRC_BUFFER_SIZE
+#define CRC_BUFFER_SIZE SPM_PAGESIZE
+#endif
 
 struct flashmgt_partition {
 	uint32_t start;
@@ -46,7 +61,7 @@ struct flashmgt_partition {
 
 struct flashmgt_status {
 	uint8_t primary : 1;
-	uint8_t upgrade_pending : 1;
+	uint8_t update_pending : 1;
 	uint8_t padding[3];
 };
 
@@ -55,13 +70,17 @@ static struct flashmgt_partition part[] = {
 	{ .start = CONFIG_FLASHMGT_P2_START, .end = CONFIG_FLASHMGT_P2_END },
 };
 
+#if !CONFIG_IMAGE_BOOTLOADER
 static struct {
 	uint8_t sec_write_ready : 1;
 } flags;
+#endif
 
 static struct flashmgt_status status;
+#if CONFIG_LIB_POLYFS_CFS
 polyfs_fs_t *flashmgt_pfs;
 polyfs_fs_t flashmgt_pfs_struct;
+#endif
 
 static void flashmgt_init(void);
 INIT_LIBRARY(flashmgt, flashmgt_init);
@@ -69,48 +88,44 @@ INIT_LIBRARY(flashmgt, flashmgt_init);
 static void flashmgt_init(void) {
 	int ret;
 
+#if CONFIG_LIB_POLYFS_CFS
 	// Nullify in case we run into trouble
 	flashmgt_pfs = NULL;
 	polyfs_cfs_fs = NULL;
+#endif
 
 	// Make sure the flash chip is ready
 	ret = dataflash_wait_ready();
 	if (ret) {
-		printf_P(PSTR("Wait 1\n"));
 		return;
 	}
 
 	// Let us change SREG
 	ret = dataflash_write_enable();
 	if (ret) {
-		printf_P(PSTR("Write enable 1\n"));
 		return;
 	}
 
 	// Clear SPRL so we can change lockbits
 	ret = dataflash_write_status(0x3c);
 	if (ret) {
-		printf_P(PSTR("Write SREG 1\n"));
 		return;
 	}
 
 	// Let us change SREG
 	dataflash_write_enable();
 	if (ret) {
-		printf_P(PSTR("Write enable 2\n"));
 		return;
 	}
 
 	// Set SPRL and lock all sectors
 	dataflash_write_status(DATAFLASH_SREG_SPRL | 0x3c);
 	if (ret) {
-		printf_P(PSTR("Write SREG 2\n"));
 		return;
 	}
 
 	// Check we have some info about the flash blocks
 	if (!settings_check(SETTINGS_KEY_FLASHMGT_STATUS, 0)) {
-		printf_P(PSTR("Settings check\n"));
 		return;
 	}
 
@@ -119,30 +134,30 @@ static void flashmgt_init(void) {
 	ret = settings_get(SETTINGS_KEY_FLASHMGT_STATUS, 0,
 		&status, &size);
 	if (ret != SETTINGS_STATUS_OK || size != sizeof(status)) {
-		printf_P(PSTR("Settings get\n"));
 		status.primary = 1; // so that secondary is 0
 		return;
 	}
 
+#if CONFIG_LIB_POLYFS_CFS
 	// Try to open the filesystem
 	ret = pfsdf_open(&flashmgt_pfs_struct,
 		part[status.primary].start,
 		part[status.primary].end - part[status.primary].start + 1);
 	if (ret < 0) {
-		printf_P(PSTR("Filesystem open\n"));
 		return;
 	}
 
 	// Set up the CFS FS pointer
 	flashmgt_pfs = &flashmgt_pfs_struct;
 	polyfs_cfs_fs = flashmgt_pfs;
+#endif
 
 	return;
 }
 
 int flashmgt_sec_open(polyfs_fs_t *ptr) {
 	int ret;
-	int sec = status.primary == 0 ? 1 : 0;
+	int sec = !status.primary;
 
 	// Clear the filesystem pointer for good measure
 	memset(ptr, 0, sizeof(*ptr));
@@ -167,13 +182,13 @@ int flashmgt_sec_close(polyfs_fs_t *ptr) {
 	return ret;
 }
 
+#if !CONFIG_IMAGE_BOOTLOADER
 int flashmgt_sec_write_start(void) {
 	int ret;
-	int sec = status.primary == 0 ? 1 : 0;
+	int sec = !status.primary;
 	uint32_t addr;
 
 	if (flags.sec_write_ready) {
-		printf_P(PSTR("Write already in progress.\n"));
 		return -1;
 	}
 
@@ -207,8 +222,6 @@ int flashmgt_sec_write_start(void) {
 
 		ret = dataflash_unprotect_sector(addr);
 		if (ret) {
-			printf_P(PSTR("Unprotect failed.\n"));
-
 			// Re-lock everything
 			dataflash_write_enable();
 			dataflash_write_status(DATAFLASH_SREG_SPRL | 0x3c);
@@ -243,7 +256,6 @@ int flashmgt_sec_write_start(void) {
 		// Let us erase sectors
 		ret = dataflash_write_enable();
 		if (ret) {
-			printf_P(PSTR("Write enable 2 failed.\n"));
 			return ret;
 		}
 
@@ -251,7 +263,6 @@ int flashmgt_sec_write_start(void) {
 			// Erase a 64K sector
 			ret = dataflash_erase_64k(addr);
 			if (ret) {
-				printf_P(PSTR("Erase 64K failed.\n"));
 				return -1;
 			}
 			addr += DATAFLASH_SECTOR_64K_SIZE;
@@ -259,7 +270,6 @@ int flashmgt_sec_write_start(void) {
 		else if (addr + DATAFLASH_SECTOR_32K_SIZE - 1 <= part[sec].end) {
 			// Erase a 32K sector
 			if (dataflash_erase_32k(addr)) {
-				printf_P(PSTR("Erase 32K failed.\n"));
 				return -1;
 			}
 			addr += DATAFLASH_SECTOR_32K_SIZE;
@@ -267,7 +277,6 @@ int flashmgt_sec_write_start(void) {
 		else {
 			// Erase a 4K sector
 			if (dataflash_erase_4k(addr)) {
-				printf_P(PSTR("Erase 4K failed.\n"));
 				return -1;
 			}
 			addr += DATAFLASH_SECTOR_4K_SIZE;
@@ -293,7 +302,7 @@ int flashmgt_sec_write_start(void) {
 }
 
 int flashmgt_sec_write_block(const void *buf, uint32_t offset, uint32_t len) {
-	int sec = status.primary == 0 ? 1 : 0;
+	int sec = !status.primary;
 	int ret;
 
 	if (!flags.sec_write_ready) {
@@ -352,33 +361,29 @@ int flashmgt_sec_write_abort(void) {
 	// Let us change SREG
 	ret = dataflash_write_enable();
 	if (ret) {
-		printf_P(PSTR("Write enable 1\n"));
 		return ret;
 	}
 
 	// Clear SPRL so we can change lockbits
 	ret = dataflash_write_status(0x3c);
 	if (ret) {
-		printf_P(PSTR("Write SREG 1\n"));
 		return ret;
 	}
 
 	// Let us change SREG
 	dataflash_write_enable();
 	if (ret) {
-		printf_P(PSTR("Write enable 2\n"));
 		return ret;
 	}
 
 	// Set SPRL and lock all sectors
 	dataflash_write_status(DATAFLASH_SREG_SPRL | 0x3c);
 	if (ret) {
-		printf_P(PSTR("Write SREG 2\n"));
 		return ret;
 	}
 
 	// Disable update pending flag
-	status.upgrade_pending = 0;
+	status.update_pending = 0;
 
 	// Write to settings
 	ret = settings_set(SETTINGS_KEY_FLASHMGT_STATUS, &status, sizeof(status));
@@ -405,47 +410,41 @@ int flashmgt_sec_write_finish(void) {
 	flags.sec_write_ready = 0;
 
 	// Disable update pending flag (we'll set it later if things pass muster)
-	status.upgrade_pending = 0;
+	status.update_pending = 0;
 
 	// Let us change SREG
 	ret = dataflash_write_enable();
 	if (ret) {
-		printf_P(PSTR("Write enable 1\n"));
 		return ret;
 	}
 
 	// Clear SPRL so we can change lockbits
 	ret = dataflash_write_status(0x3c);
 	if (ret) {
-		printf_P(PSTR("Write SREG 1\n"));
 		return ret;
 	}
 
 	// Let us change SREG
 	dataflash_write_enable();
 	if (ret) {
-		printf_P(PSTR("Write enable 2\n"));
 		return ret;
 	}
 
 	// Set SPRL and lock all sectors
 	dataflash_write_status(DATAFLASH_SREG_SPRL | 0x3c);
 	if (ret) {
-		printf_P(PSTR("Write SREG 2\n"));
 		return ret;
 	}
 
 	// Open the new filesystem so we can check the CRC
 	ret = flashmgt_sec_open(&tempfs);
 	if (ret) {
-		printf_P(PSTR("FS open\n"));
 		goto out;
 	}
 
 	// Malloc a buffer for the CRC check
 	crcbuf = malloc(CRC_BUFFER_SIZE);
 	if (!crcbuf) {
-		printf_P(PSTR("malloc\n"));
 		ret = -1;
 		goto out;
 	}
@@ -453,12 +452,11 @@ int flashmgt_sec_write_finish(void) {
 	// Check new filesystem CRC
 	ret = polyfs_check_crc(&tempfs, crcbuf, CRC_BUFFER_SIZE);
 	if (ret) {
-		printf_P(PSTR("CRC check\n"));
 		goto out;
 	}
 
 	// Set status flags
-	status.upgrade_pending = 1;
+	status.update_pending = 1;
 
 out:
 	// Close the filesystem
@@ -473,7 +471,6 @@ out:
 	int ret2 = settings_set(SETTINGS_KEY_FLASHMGT_STATUS,
 		&status, sizeof(status));
 	if (ret2 != SETTINGS_STATUS_OK) {
-		printf_P(PSTR("Settings write fail.\n"));
 		ret = ret2;
 	}
 
@@ -481,11 +478,118 @@ out:
 
 	return ret;
 }
+#endif
 
 #if CONFIG_IMAGE_BOOTLOADER
+static uint8_t buf[CRC_BUFFER_SIZE];
 
-int flashmgt_check_pending(void);
-int flashmgt_swap_partitions(void);
+static void boot_program_page(uint32_t page, uint8_t *buf) {
+	uint16_t i;
+	uint8_t sreg;
 
+	// Disable interrupts.
+	sreg = SREG;
+	cli();
+
+	boot_page_erase_safe(page);
+	boot_spm_busy_wait();
+
+	for (i = 0; i < SPM_PAGESIZE; i += 2) {
+		// Set up little-endian word.
+
+		uint16_t w = *buf++;
+		w += (*buf++) << 8;
+
+		boot_page_fill(page + i, w);
+	}
+
+	// Store buffer in flash page.
+	boot_page_write_safe(page);
+	boot_spm_busy_wait();
+
+	// Reenable RWW-section again. We need this if we want to jump back
+	// to the application after bootloading.
+	boot_rww_enable ();
+
+	// Re-enable interrupts (if they were ever enabled).
+	SREG = sreg;
+}
+
+bool flashmgt_update_pending(void) {
+	return status.update_pending;
+}
+
+int flashmgt_bootload(void) {
+	int ret;
+	polyfs_fs_t tempfs;
+	struct polyfs_inode sysimg;
+
+	// Don't do anything unless an update is lined up
+	if (!status.update_pending) {
+		return 0;
+	}
+
+	// Even if the update fails, we clear the pending flag
+	status.update_pending = 0;
+
+	// Open the new filesystem so we can check the CRC
+	ret = flashmgt_sec_open(&tempfs);
+	if (ret) {
+		goto out;
+	}
+
+	// Check new filesystem CRC
+	ret = polyfs_check_crc(&tempfs, buf, CRC_BUFFER_SIZE);
+	if (ret) {
+		goto out;
+	}
+
+	// Look up the system image file
+	ret = polyfs_lookup(&tempfs, "/system.bin", &sysimg);
+	if (ret) {
+		goto out;
+	}
+
+	// Loop through the entire file
+	uint32_t offset = 0;
+	while (offset < POLYFS_24(sysimg.size)) {
+		// Read a block from the file
+		ret = polyfs_fread(&tempfs, &sysimg, buf, offset,
+				CRC_BUFFER_SIZE);
+		if (ret < 0) {
+			goto out;
+		}
+		else if (ret == 0) {
+			memset(&buf[ret], 0xff, CRC_BUFFER_SIZE - ret);
+			break;
+		}
+
+		// Write the page
+		boot_program_page(offset, buf);
+
+		// Advance the offset
+		offset += ret;
+	}
+	ret = 0;
+
+	// Re-enable the RWW section
+	boot_rww_enable();
+
+	// Swap the partitions around
+	status.primary = !status.primary;
+
+out:
+	// Close the filesystem
+	flashmgt_sec_close(&tempfs);
+
+	// Write status to settings
+	int ret2 = settings_set(SETTINGS_KEY_FLASHMGT_STATUS,
+		&status, sizeof(status));
+	if (ret2 != SETTINGS_STATUS_OK) {
+		ret = ret2;
+	}
+
+	return ret;
+}
 #endif
 
