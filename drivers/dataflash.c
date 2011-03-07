@@ -52,6 +52,34 @@
 // size of dataflash in bytes
 #define FLASH_SIZE 1048576
 
+#if __AVR_LIBC_VERSION__ < 10700UL && CONFIG_IMAGE_BOOTLOADER
+static inline void *memcpy_PF(void *dest, uint_farptr_t src, size_t len) {
+	uint8_t *ptr = dest;
+	while (len--) {
+		*ptr++ = pgm_read_byte_far(src++);
+	}
+	return dest;
+}
+
+#define pgm_get_far_address(var)                          \
+({                                                    \
+	uint_farptr_t tmp;                                \
+                                                      \
+	__asm__ __volatile__(                             \
+                                                      \
+			"ldi	%A0, lo8(%1)"           "\n\t"    \
+			"ldi	%B0, hi8(%1)"           "\n\t"    \
+			"ldi	%C0, hh8(%1)"           "\n\t"    \
+			"clr	%D0"                    "\n\t"    \
+		:                                             \
+			"=d" (tmp)                                \
+		:                                             \
+			"p"  (&(var))                             \
+	);                                                \
+	tmp;                                              \
+})
+#endif
+
 static const dataflash_sector_t sectors[] PROGMEM = {
 	{ 0x00000, 0x0ffff }, //  0: 64K
 	{ 0x10000, 0x1ffff }, //  1: 64K
@@ -175,7 +203,10 @@ int dataflash_sector_from_addr(uint32_t addr, dataflash_sector_t *sector) {
 	// Loop through the table of sectors
 	for (int i = 0; i < (sizeof(sectors) / sizeof(dataflash_sector_t)); i++) {
 		// Copy the array entry into the buffer
-		memcpy_P(sector, &sectors[i], sizeof(*sector));
+		int ret = dataflash_sector_by_idx(i, sector);
+		if (ret) {
+			return ret;
+		}
 
 		// Is this the entry we're after?
 		if ((sector->start <= addr) && 
@@ -194,8 +225,20 @@ int dataflash_sector_by_idx(uint8_t idx, dataflash_sector_t *sector) {
 		return -1;
 	}
 
+#if CONFIG_IMAGE_BOOTLOADER
+	// Get the address of the start of the array
+	uint_farptr_t addr = pgm_get_far_address(sectors);
+
+	// Advance to the correct index
+	addr += idx * sizeof(dataflash_sector_t);
+
+	// Copy the entry over
+	memcpy_PF(sector, addr, sizeof(*sector));
+#else
 	// Copy the entry over
 	memcpy_P(sector, &sectors[idx], sizeof(*sector));
+#endif
+
 	return 0;
 }
 
