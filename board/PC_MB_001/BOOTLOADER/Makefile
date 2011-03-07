@@ -3,9 +3,9 @@
 LDFLAGS += -Wl,--section-start=.text=$(CONFIG_BOOTLDR_START_ADDR)
 
 # Fuse values
-EFUSE =  0xFF	# default FF (no BOD)
-HFUSE =  0x98	# default 99 (bootrst)
-LFUSE =  0xE7	# default 62 (no clock div, crystal osc)
+EFUSE =  0xFD	# default FF (BOD 2.7V)
+HFUSE =  0x90	# default 99 (bootrst + eesave)
+LFUSE =  0xF7	# default 62 (no clock div, crystal osc, slow power)
 UNLOCK = 0x3F	# everything unlocked
 LOCK =   0x0F	# BLB12 and BLB11 programmed
 
