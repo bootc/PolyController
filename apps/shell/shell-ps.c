@@ -40,10 +40,8 @@
 
 #include <contiki.h>
 #include <stdarg.h>
-#include "shell-ps.h"
 
-#include <stdio.h>
-#include <string.h>
+#include "shell.h"
 
 PROCESS(shell_ps_process, "ps");
 SHELL_COMMAND(ps_command,

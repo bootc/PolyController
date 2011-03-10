@@ -38,49 +38,24 @@
  *         Adam Dunkels <adam@sics.se>
  */
 
-#include "contiki.h"
+#include <contiki.h>
+#include <stdarg.h>
+#include <avr/wdt.h>
 #include "shell.h"
-#include "dev/leds.h"
-#include "dev/watchdog.h"
 
-#include <stdio.h>
-#include <string.h>
-
-/*---------------------------------------------------------------------------*/
 PROCESS(shell_reboot_process, "reboot");
 SHELL_COMMAND(reboot_command,
-		"reboot",
-		"reboot: reboot the system",
-		&shell_reboot_process);
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(shell_reboot_process, ev, data)
-{
-	static struct etimer etimer;
+	"reboot",
+	"reboot: reboot the system",
+	&shell_reboot_process);
+INIT_SHELL_COMMAND(reboot_command);
+
+PROCESS_THREAD(shell_reboot_process, ev, data) {
 	PROCESS_BEGIN();
 
-	shell_output_P(&reboot_command,
-		PSTR("Rebooting the node in four seconds..."));
-
-	etimer_set(&etimer, CLOCK_SECOND);
-	PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
-	leds_on(LEDS_RED);
-	etimer_reset(&etimer);
-	PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
-	leds_on(LEDS_GREEN);
-	etimer_reset(&etimer);
-	PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
-	leds_on(LEDS_BLUE);
-	etimer_reset(&etimer);
-	PROCESS_WAIT_UNTIL(etimer_expired(&etimer));
-
-	watchdog_reboot();
+	wdt_enable(WDTO_15MS);
+	while (1);
 
 	PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
-	void
-shell_reboot_init(void)
-{
-	shell_register_command(&reboot_command);
-}
-/*---------------------------------------------------------------------------*/
+
