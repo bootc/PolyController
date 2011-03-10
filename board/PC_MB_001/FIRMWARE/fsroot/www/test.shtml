@@ -1,0 +1,7 @@
+%!:/head.html
+
+<h1>PolyController</h1>
+<p>Welcome to the PolyController web interface.</p>
+<p>This is a test of dynamically created pages (with includes).</p>
+
+%!:/foot.html
