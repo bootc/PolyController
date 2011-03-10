@@ -35,9 +35,8 @@
 #ifndef __HTTPD_H__
 #define __HTTPD_H__
 
-
 #include <contiki-net.h>
-#include <cfs/cfs.h>
+#include "sendfile.h"
 
 #ifndef CONFIG_APPS_WEBSERVER_PATHLEN
 #define HTTPD_PATHLEN 80
@@ -53,20 +52,9 @@ struct httpd_state {
 	struct pt scriptpt;
 	uint8_t inputbuf[HTTPD_PATHLEN + 30];
 	char filename[HTTPD_PATHLEN];
-	char script[HTTPD_PATHLEN];
 	char state;
-	int fd;
-	int len;
-	cfs_offset_t fpos;
-	int savefd;
-	cfs_offset_t savefpos;
-	struct {
-		uint8_t err : 1;
-		uint8_t eof : 1;
-		uint8_t script : 1;
-	} flags;
+	struct sendfile_state sendfile;
 };
-
 
 void httpd_init(void);
 void httpd_appcall(void *state);
