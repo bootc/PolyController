@@ -1,12 +1,16 @@
 
+* Bootloader
+ * Check EEPROM at every reboot
+ * Slightly longer initial boot delay
+
 * Command-line CFS/PolyFS peeking
 * Command-line 1-wire peeking
 * Command-line sensor interface
 * Command-line owfs interface
 
 * Configuration framework
- * EEPROM read/write
  * Config backup/restore
+ * JSON conversion
 * Sensor framework
  * Individual sensors (1-wire or owfs)
  * Sensor groups (with consolidation functions like AVG,MIN,MAX)
