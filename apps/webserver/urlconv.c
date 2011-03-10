@@ -35,15 +35,8 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <stdio.h> // for debug only
-#include <avr/pgmspace.h>
 
 #include "urlconv.h"
-
-#ifndef __AVR__
-#define PSTR(x) (x)
-#define printf_P(...) printf(__VA_ARGS__)
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* URL to filename conversion
@@ -67,8 +60,6 @@ void urlconv_tofilename(char *out, const char *in, unsigned char maxlen) {
 	else {
 		maxlen--;
 	}
-
-	printf_P(PSTR("IN:%s "), in);
 
 	// Output path is always absolute
 	out[idx++] = '/';
@@ -153,7 +144,5 @@ void urlconv_tofilename(char *out, const char *in, unsigned char maxlen) {
 
 	// Null terminate the output
 	out[idx] = '\0';
-
-	printf_P(PSTR("OUT:%s\n"), out);
 }
 

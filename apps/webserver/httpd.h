@@ -63,6 +63,7 @@ struct httpd_state {
 	struct {
 		uint8_t err : 1;
 		uint8_t eof : 1;
+		uint8_t script : 1;
 	} flags;
 };
 

@@ -38,7 +38,7 @@
 #include <init.h>
 
 #include "contiki.h"
-#include "sys/log.h"
+#include "apps/syslog.h"
 
 #include "http-strings.h"
 #include "webserver.h"
@@ -67,21 +67,17 @@ void webserver_log_file(uip_ipaddr_t *requester, char *file) {
 
 #if UIP_CONF_IPV6
 	char buf[48];
-	uint8_t j = httpd_sprint_ip6((uip_ip6addr_t)*requester, buf);
-	buf[j] = ':';
-	buf[j + 1] = ' ';
-	buf[j + 2] = 0;
+	httpd_sprint_ip6(*requester, buf);
 #else
 	char buf[20];
-	sprintf_P(buf, PSTR("%d.%d.%d.%d: "), requester->u8[0], requester->u8[1],
-			requester->u8[2], requester->u8[3]);
+	sprintf_P(buf, PSTR("%d.%d.%d.%d"), uip_ipaddr_to_quad(requester));
 #endif /* UIP_CONF_IPV6 */
 
-	log_message(buf, file);
+	syslog_P(LOG_LOCAL0 | LOG_INFO, PSTR("%s: %s"), buf, file);
 #endif /* LOG_CONF_ENABLED */
 }
 
 void webserver_log(char *msg) {
-	log_message(msg, "");
+	syslog_P(LOG_LOCAL0 | LOG_INFO, PSTR("%s"), msg);
 }
 

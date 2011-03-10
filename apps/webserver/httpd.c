@@ -82,7 +82,7 @@ static unsigned short send_file_gen(void *state) {
 
 	// Seek to the offset to send from (this could be different to the fd
 	// internal offset due to retransmits)
-	int ret = cfs_seek(s->fd, s->fpos, CFS_SEEK_SET);
+	cfs_offset_t ret = cfs_seek(s->fd, s->fpos, CFS_SEEK_SET);
 	if (ret != s->fpos) {
 		return 0;
 	}
@@ -145,6 +145,7 @@ static unsigned short send_script_chunk_gen(void *state) {
 	struct httpd_state *s = (struct httpd_state *)state;
 
 	s->flags.eof = 0;
+	s->flags.script = 0;
 
 	// Seek to the offset to send from (this could be different to the fd
 	// internal offset due to retransmits)
@@ -157,6 +158,12 @@ static unsigned short send_script_chunk_gen(void *state) {
 	s->len = cfs_read(s->fd, uip_appdata, UIP_TCP_MSS);
 	if (s->len < 0) {
 		return 0;
+	}
+
+	// Check if we've reached the end of file
+	cfs_offset_t len = cfs_seek(s->fd, 0, CFS_SEEK_END);
+	if (s->fpos + len >= len) {
+		s->flags.eof = 1;
 	}
 
 	// Have we reached the end of the file?
@@ -181,6 +188,7 @@ static unsigned short send_script_chunk_gen(void *state) {
 		if (*(tmp + 1) == ISO_bang) {
 			// %! found, so shorten the send bytes
 			s->len = idx;
+			s->flags.script = 1;
 			break;
 		}
 	}
@@ -199,6 +207,10 @@ static PT_THREAD(send_script_chunk(struct httpd_state *s)) {
 		if (s->len > 0) {
 			s->fpos += s->len;
 		}
+
+		if (s->flags.eof || s->flags.script) {
+			break;
+		}
 	} while (s->len > 0);
 
 	PSOCK_END(&s->sout);
@@ -206,6 +218,8 @@ static PT_THREAD(send_script_chunk(struct httpd_state *s)) {
 
 static PT_THREAD(handle_script(struct httpd_state *s)) {
 	PT_BEGIN(&s->scriptpt);
+
+	printf_P(PSTR("Handling a script!\n"));
 
 	while (1) {
 		int ret;
@@ -343,18 +357,18 @@ static PT_THREAD(handle_output(struct httpd_state *s)) {
 		if (s->fd < 0) {
 			PT_WAIT_THREAD(&s->outputpt, send_pstring(s, PSTR("not found")));
 			uip_close();
-			webserver_log_file(&uip_conn->ripaddr, "404 (no notfound.htm)");
+			webserver_log_file(&uip_conn->ripaddr, "404 (no notfound.html)");
 			PT_EXIT(&s->outputpt);
 		}
 
-		webserver_log_file(&uip_conn->ripaddr, "404 - notfound.htm");
+		webserver_log_file(&uip_conn->ripaddr, "404 notfound.html");
 	}
 	else {
 		PT_WAIT_THREAD(&s->outputpt, send_headers(s, http_header_200));
 	}
 
 	char *ptr = strrchr(s->filename, ISO_period);
-	if (ptr != NULL && strncmp(ptr, http_shtml, 6) == 0) {
+	if (ptr != NULL && strncmp_P(ptr, http_shtml, sizeof(http_shtml)) == 0) {
 		PT_INIT(&s->scriptpt);
 		PT_WAIT_THREAD(&s->outputpt, handle_script(s));
 	}
@@ -408,11 +422,6 @@ static PT_THREAD(handle_input(struct httpd_state *s)) {
 
 	while (1) {
 		PSOCK_READTO(&s->sin, ISO_nl);
-
-		if (strncmp_P((char *)s->inputbuf, http_referer, 8) == 0) {
-			s->inputbuf[PSOCK_DATALEN(&s->sin) - 2] = 0;
-			webserver_log((char *)s->inputbuf);
-		}
 	}
 
 	PSOCK_END(&s->sin);
