@@ -75,7 +75,7 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 		uint32_t ms = ((uint32_t)time.frac * 1000) >> 12;
 
 		shell_output_P(&shell_date_command,
-			PSTR("Fractional time (secs since epoch): %ld.%04lus"),
+			PSTR("Fractional time (secs since epoch): %ld.%03lus"),
 			time.sec, ms);
 	}
 	else {
