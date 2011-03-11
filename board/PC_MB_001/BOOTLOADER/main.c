@@ -49,25 +49,49 @@ void early_init(void) {
 	wdt_disable();
 }
 
+static inline void app_start(void) __attribute__((__noreturn__));
 static inline void app_start(void) {
+	// Make sure interrupts go to the application section
+	uint8_t mcucr = MCUCR;
+	MCUCR = mcucr | _BV(IVCE);
+	MCUCR = mcucr & ~_BV(IVSEL);
+
+	// Start the app
+	app_start_real();
+}
+
+static void reboot(void) __attribute__((__noreturn__));
+static void reboot(void) {
 	// Reset via watchdog
 	wdt_enable(WDTO_15MS);
 	while (1);
 }
 
 int main(void) {
+	bool delay_boot = 1;
+	bool start_app = 1;
+
 	// Basic board init
 	board_init();
 
-	// Did we reboot due to watchdog?
-	if (mcusr_mirror & _BV(WDRF) && pgm_read_byte(app_start_real) != 0xff) {
-		// Make sure interrupts go to the application section
-		uint8_t mcucr = MCUCR;
-		MCUCR = mcucr | _BV(IVCE);
-		MCUCR = mcucr & ~_BV(IVSEL);
+	// Check for watchdog or JTAG reset
+	if (mcusr_mirror & (_BV(WDRF) | _BV(JTRF))) {
+		delay_boot = 0;
+	}
 
-		// Start the app
-		app_start_real();
+	// Check if the application area has some code in it
+	if (pgm_read_byte(app_start_real) == 0xff) {
+		start_app = 0;
+	}
+
+	// Check if there's a code update lined up
+	if (flashmgt_update_pending()) {
+		start_app = 0;
+	}
+
+	// Start the app now if we're not delaying or upgrading
+	if (start_app && !delay_boot) {
+		app_start();
 	}
 
 	// Move interrupt vectors to bootloader section
@@ -92,14 +116,17 @@ int main(void) {
 	// Initialise everything else
 	init_doinit();
 
-	// Do a little LED dance while things settle
-	for (int i = 0; i <= 7; i++) {
-		PORTA |= _BV(i);
-		_delay_ms(50);
-	}
-	for (int i = 0; i <= 7; i++) {
-		PORTA &= ~_BV(i);
-		_delay_ms(50);
+	// Delay boot?
+	if (delay_boot) {
+		// Do a little LED dance on the diag port while things settle
+		for (int i = 0; i <= 7; i++) {
+			PORTA |= _BV(i);
+			_delay_ms(125);
+		}
+		for (int i = 0; i <= 7; i++) {
+			PORTA &= ~_BV(i);
+			_delay_ms(125);
+		}
 	}
 
 	// Check to see if we need to update the MCU flash
@@ -115,10 +142,18 @@ int main(void) {
 			uart_puts("Code has been updated. Rebooting.\r\n");
 		}
 	}
+	else {
+		// FIXME: Some sort of rescue mode?
+		uart_puts("In bootloader, but no upgrade pending. Hanging.\r\n");
+		while (1) {
+			PORTA = 0xaa;
+			_delay_ms(200);
+			PORTA = 0x55;
+			_delay_ms(200);
+		};
+	}
 
-	// Start the app
-	app_start();
-
-	return 0; // never reached
+	// Reset ourselves
+	reboot();
 }
 

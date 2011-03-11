@@ -516,6 +516,14 @@ static void boot_program_page(uint32_t page, uint8_t *buf) {
 }
 
 bool flashmgt_update_pending(void) {
+	// Read in the info
+	size_t size = sizeof(status);
+	int ret = settings_get(SETTINGS_KEY_FLASHMGT_STATUS, 0,
+			&status, &size);
+	if (ret != SETTINGS_STATUS_OK || size != sizeof(status)) {
+		return false;
+	}
+
 	return status.update_pending;
 }
 

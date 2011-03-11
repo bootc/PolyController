@@ -45,8 +45,8 @@
 static inline uint32_t min(uint32_t a, uint32_t b);
 
 // Read a raw buffer from underlying storage
-static inline int read_storage(polyfs_fs_t *fs, void *ptr,
-	uint32_t offset, uint32_t bytes);
+static int read_storage(polyfs_fs_t *fs, void *ptr,
+	uint32_t offset, uint16_t bytes);
 // Read a uint32_t from underlying storage and adjust byte order
 static inline int read_storage_uint32(polyfs_fs_t *fs,
 	uint32_t *ptr, uint32_t offset);
@@ -92,12 +92,12 @@ int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
 	uint32_t crc = crc32(0, NULL, 0);
 	uint32_t size = 0;
 	uint32_t read_crc = 0;
-	uint32_t length = 0;
+	uint32_t offset = 0;
 	int ret;
 
 	while (1) {
 		// Read a block of FS data
-		ret = read_storage(fs, temp, length, tempsize);
+		ret = read_storage(fs, temp, offset, tempsize);
 		if (ret < 0) {
 			return ret;
 		}
@@ -106,7 +106,7 @@ int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
 		}
 
 		// If we've just read the superblock, extract some info
-		if (length == 0) {
+		if (offset == 0) {
 			struct polyfs_super *super = (struct polyfs_super *)temp;
 			size = POLYFS_32(super->size);
 			read_crc = POLYFS_32(super->fsid.crc);
@@ -115,11 +115,11 @@ int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
 			super->fsid.crc = POLYFS_32(crc32(0, NULL, 0));
 		}
 
-		length += ret;
+		offset += ret;
 
 		// Reached the end of the filesystem
-		if (length > size) {
-			crc = crc32(crc, temp, ret - (length - size));
+		if (offset > size) {
+			crc = crc32(crc, temp, ret - (offset - size));
 			break;
 		}
 
@@ -134,19 +134,19 @@ int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
 }
 
 int32_t polyfs_fread(polyfs_fs_t *fs, const struct polyfs_inode *inode,
-	void *ptr, uint32_t offset, uint32_t bytes)
+	void *ptr, uint32_t offset, uint16_t bytes)
 {
 	int err;
 
 	// the number of bytes we would like to read
-	uint32_t read_bytes = bytes;
+	uint16_t read_bytes = bytes;
 	// the number of blocks that make up this inode
 	uint32_t blocks = (POLYFS_24(inode->size) + POLYFS_BLOCK_SIZE - 1) /
 		POLYFS_BLOCK_SIZE;
 	// the offset of the data section of this inode (start of block pointers)
 	uint32_t inode_offset = POLYFS_GET_OFFSET(inode) << 2;
 	// the block number that the offset falls into
-	uint32_t block = offset / POLYFS_BLOCK_SIZE;
+	uint16_t block = offset / POLYFS_BLOCK_SIZE;
 	// offset of the first block of data (block 0)
 	uint32_t start_offset = inode_offset + (blocks * 4);
 	// offset of the block pointer
@@ -173,6 +173,7 @@ int32_t polyfs_fread(polyfs_fs_t *fs, const struct polyfs_inode *inode,
 		read_bytes = inode->size - offset;
 	}
 
+	// If we were asked to read nothing, we can return quickly
 	if (read_bytes == 0) {
 		return 0;
 	}
@@ -319,13 +320,8 @@ int polyfs_lookup(polyfs_fs_t *fs, const char *path,
 		}
 
 		// Work out the length of this path element
-		term = strchr(path, '/');
-		if (term) {
-			len = term - path;
-		}
-		else {
-			len = strlen(path);
-		}
+		term = strchrnul(path, '/');
+		len = term - path;
 
 		// We have nothing left to look at
 		if (len == 0) {
@@ -386,8 +382,8 @@ static inline uint32_t min(uint32_t a, uint32_t b) {
 	return (a < b) ? a : b;
 }
 
-static inline int read_storage(polyfs_fs_t *fs, void *ptr,
-	uint32_t offset, uint32_t bytes)
+static int read_storage(polyfs_fs_t *fs, void *ptr,
+	uint32_t offset, uint16_t bytes)
 {
 	if (fs->fn_read == NULL) {
 		PRINTF1("fn_read not set!\n");
