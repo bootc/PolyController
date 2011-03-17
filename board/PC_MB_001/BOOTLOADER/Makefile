@@ -1,4 +1,7 @@
 
+# Extra CFLAGS
+CFLAGS += -fno-jump-tables -mcall-prologues
+
 # Set .text section address for bootloader
 LDFLAGS += -Wl,--section-start=.text=$(CONFIG_BOOTLDR_START_ADDR)
 

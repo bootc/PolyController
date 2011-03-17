@@ -68,25 +68,28 @@ static void reboot(void) {
 }
 
 int main(void) {
-	bool delay_boot = 1;
-	bool start_app = 1;
+	bool delay_boot = true;
+	bool start_app = true;
+	bool rescue = false;
 
 	// Basic board init
 	board_init();
 
 	// Check for watchdog or JTAG reset
 	if (mcusr_mirror & (_BV(WDRF) | _BV(JTRF))) {
-		delay_boot = 0;
+		delay_boot = false;
 	}
 
 	// Check if the application area has some code in it
 	if (pgm_read_byte(app_start_real) == 0xff) {
-		start_app = 0;
+		start_app = false;
+		rescue = true;
 	}
 
 	// Check if there's a code update lined up
 	if (flashmgt_update_pending()) {
-		start_app = 0;
+		start_app = false;
+		rescue = false;
 	}
 
 	// Start the app now if we're not delaying or upgrading
@@ -110,8 +113,11 @@ int main(void) {
 		(UBRRL_VALUE << 0) |
 		(USE_2X ? 0x8000 : 0));
 
+	// Clear screen
+	uart_puts("\r\n\x1b[H\x1b[J");
+
 	// Print boot message
-	uart_puts("\r\nPolyController " CONFIG_BOARD " " CONFIG_IMAGE "\r\n");
+	uart_puts("PolyController " CONFIG_BOARD " " CONFIG_IMAGE "\r\n\r\n");
 
 	// Initialise everything else
 	init_doinit();
@@ -139,12 +145,12 @@ int main(void) {
 			uart_puts("Code update failed!\r\n");
 		}
 		else {
-			uart_puts("Code has been updated. Rebooting.\r\n");
+			uart_puts("Code has been updated.\r\n");
 		}
 	}
-	else {
+	else if (rescue) {
 		// FIXME: Some sort of rescue mode?
-		uart_puts("In bootloader, but no upgrade pending. Hanging.\r\n");
+		uart_puts("Rescue mode not yet implemented. Hanging.\r\n");
 		while (1) {
 			PORTA = 0xaa;
 			_delay_ms(200);
