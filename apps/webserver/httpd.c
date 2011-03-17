@@ -270,8 +270,9 @@ void httpd_appcall(void *state) {
 
 				// Free state data
 				free(s);
-				conns_free++;
+				s = NULL;
 				tcp_markconn(uip_conn, NULL);
+				conns_free++;
 
 				webserver_log_file(&uip_conn->ripaddr, "408 Connection reset");
 			}
@@ -280,7 +281,9 @@ void httpd_appcall(void *state) {
 			timer_restart(&s->timer);
 		}
 
-		handle_connection(s);
+		if (s) {
+			handle_connection(s);
+		}
 	}
 	else {
 		uip_abort();
