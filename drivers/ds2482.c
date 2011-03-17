@@ -20,6 +20,7 @@
 
 #include <string.h>
 #include <util/crc16.h>
+#include <util/delay.h>
 
 #include "ds2482.h"
 #include "i2c.h"
@@ -307,15 +308,20 @@ static int ds2482_search_triplet(int search_direction) {
 	// loop checking 1WB bit for completion of 1-Wire operation
 	// abort if poll limit reached
 	status = i2c_read(1);
-	do {
+	while (status & STATUS_1WB) {
+		if (poll_count++ >= POLL_LIMIT) {
+			break;
+		}
+
+		_delay_us(20);
 		status = i2c_read(status & STATUS_1WB);
 	}
-	while ((status & STATUS_1WB) && (poll_count++ < POLL_LIMIT));
-
-	i2c_stop();
 
 	// check for failure due to poll limit reached
-	if (poll_count >= POLL_LIMIT) {
+	if (status & STATUS_1WB) {
+		i2c_stop();
+
+		// handle error
 		ds2482_reset();
 		return -1;
 	}
@@ -349,15 +355,19 @@ int ow_reset(void) {
 	// loop checking 1WB bit for completion of 1-Wire operation
 	// abort if poll limit reached
 	status = i2c_read(1);
-	do {
+	while (status & STATUS_1WB) {
+		if (poll_count++ >= POLL_LIMIT) {
+			break;
+		}
+
+		_delay_us(20);
 		status = i2c_read(status & STATUS_1WB);
 	}
-	while ((status & STATUS_1WB) && (poll_count++ < POLL_LIMIT));
-
-	i2c_stop();
 
 	// check for failure due to poll limit reached
-	if (poll_count >= POLL_LIMIT) {
+	if (status & STATUS_1WB) {
+		i2c_stop();
+
 		// handle error
 		ds2482_reset();
 		return -1;
@@ -418,15 +428,20 @@ static int ow_touch_bit(uint8_t sendbit) {
 	// loop checking 1WB bit for completion of 1-Wire operation
 	// abort if poll limit reached
 	status = i2c_read(1);
-	do {
+	while (status & STATUS_1WB) {
+		if (poll_count++ >= POLL_LIMIT) {
+			break;
+		}
+
+		_delay_us(20);
 		status = i2c_read(status & STATUS_1WB);
 	}
-	while ((status & STATUS_1WB) && (poll_count++ < POLL_LIMIT));
-
-	i2c_stop();
 
 	// check for failure due to poll limit reached
-	if (poll_count >= POLL_LIMIT) {
+	if (status & STATUS_1WB) {
+		i2c_stop();
+
+		// handle error
 		ds2482_reset();
 		return -1;
 	}
@@ -469,15 +484,20 @@ int ow_write_byte(uint8_t sendbyte) {
 	// loop checking 1WB bit for completion of 1-Wire operation
 	// abort if poll limit reached
 	status = i2c_read(1);
-	do {
+	while (status & STATUS_1WB) {
+		if (poll_count++ >= POLL_LIMIT) {
+			break;
+		}
+
+		_delay_us(20);
 		status = i2c_read(status & STATUS_1WB);
 	}
-	while ((status & STATUS_1WB) && (poll_count++ < POLL_LIMIT));
-
-	i2c_stop();
 
 	// check for failure due to poll limit reached
-	if (poll_count >= POLL_LIMIT) {
+	if (status & STATUS_1WB) {
+		i2c_stop();
+
+		// handle error
 		ds2482_reset();
 		return -1;
 	}
@@ -513,13 +533,20 @@ int ow_read_byte(void) {
 	// loop checking 1WB bit for completion of 1-Wire operation
 	// abort if poll limit reached
 	status = i2c_read(1);
-	do {
+	while (status & STATUS_1WB) {
+		if (poll_count++ >= POLL_LIMIT) {
+			break;
+		}
+
+		_delay_us(20);
 		status = i2c_read(status & STATUS_1WB);
 	}
-	while ((status & STATUS_1WB) && (poll_count++ < POLL_LIMIT));
 
 	// check for failure due to poll limit reached
-	if (poll_count >= POLL_LIMIT) {
+	if (status & STATUS_1WB) {
+		i2c_stop();
+
+		// handle error
 		ds2482_reset();
 		return -1;
 	}
