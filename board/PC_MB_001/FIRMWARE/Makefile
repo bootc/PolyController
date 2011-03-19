@@ -45,6 +45,8 @@ EXTRA_BUILD_RULES += pfs
 EXTRA_CLEAN_FILES += $(TARGET).bin $(TARGET).pfs
 EXTRA_CLEAN_DIRS += $(BUILDDIR)/fsroot
 
+PRINTF_LIB = $(PRINTF_LIB_FLOAT)
+
 .PHONY: pfs
 
 $(eval $(call subdir,$(curdir)))
