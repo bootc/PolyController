@@ -62,6 +62,7 @@
 #define __SHELL_H__
 
 #include "sys/process.h"
+#include <stdarg.h>
 #include <avr/pgmspace.h>
 #include <init.h>
 
