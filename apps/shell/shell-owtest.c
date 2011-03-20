@@ -40,34 +40,54 @@ static ow_addr_t sensor;
 static struct timer timeout;
 
 static PT_THREAD(read_temp(struct pt *pt)) {
+	int err;
 	uint8_t scratch[9];
 	uint8_t crc = 0;
 
 	PT_BEGIN(pt);
 
-	// Reset the bus and send MATCH ROM
-	ow_reset();
-	ow_write_byte(0x55); // Match ROM
+	// Reset the bus
+	err = ow_reset();
+	if (err != 1) {
+		printf_P(PSTR("Reset failed.\n"));
+		PT_EXIT(pt);
+	}
+
+	// Match ROM
+	err = ow_write_byte(0x55);
+	if (err) {
+		printf_P(PSTR("Match ROM failed\n"));
+		PT_EXIT(pt);
+	}
 	for (int i = 0; i < sizeof(ow_addr_t); i++) {
-		ow_write_byte(sensor[i]);
+		err = ow_write_byte(sensor[i]);
+		if (err) {
+			printf_P(PSTR("Match ROM failed\n"));
+			PT_EXIT(pt);
+		}
 	}
 
 	// Start temperature conversion
-	ow_write_byte(0x44);
+	err = ow_write_byte(0x44);
+	if (err) {
+		printf_P(PSTR("Convert T failed\n"));
+		PT_EXIT(pt);
+	}
 
 	// Conversion timeout
 	timer_set(&timeout, DS18B20_CONV_TIMEOUT);
 	while (1) {
+		_delay_ms(10); // for good measure
+
 		// Read a bit from the bus
 		int ret = ow_read_bit();
 
 		// Check for stop conditions
 		if (ret == 1) {
-			printf_P(PSTR("Conversion done!\n"));
 			break;
 		}
 		else if (ret == -1) {
-			printf_P(PSTR("Read bit failed.\n"));
+			printf_P(PSTR("Read status failed.\n"));
 			PT_EXIT(pt);
 		}
 		else if (timer_expired(&timeout)) {
@@ -81,16 +101,41 @@ static PT_THREAD(read_temp(struct pt *pt)) {
 	}
 
 	// Reset and MATCH ROM again
-	ow_reset();
-	ow_write_byte(0x55); // Match ROM
+	err = ow_reset();
+	if (err != 1) {
+		printf_P(PSTR("Reset failed.\n"));
+		PT_EXIT(pt);
+	}
+
+	// Match ROM
+	err = ow_write_byte(0x55);
+	if (err) {
+		printf_P(PSTR("Match ROM failed\n"));
+		PT_EXIT(pt);
+	}
 	for (int i = 0; i < sizeof(ow_addr_t); i++) {
-		ow_write_byte(sensor[i]);
+		err = ow_write_byte(sensor[i]);
+		if (err) {
+			printf_P(PSTR("Match ROM failed\n"));
+			PT_EXIT(pt);
+		}
 	}
 
 	// Read the scratch pad
-	ow_write_byte(0xBE); // Read Scratch Pad
-	for (int i = 0; i < sizeof(scratch); i++){
-		scratch[i] = ow_read_byte();
+	err = ow_write_byte(0xBE);
+	if (err) {
+		printf_P(PSTR("Read scratch pad failed\n"));
+		PT_EXIT(pt);
+	}
+
+	for (int i = 0; i < sizeof(scratch); i++) {
+		err = ow_read_byte();
+		if (err < 0) {
+			printf_P(PSTR("Read byte failed\n"));
+			PT_EXIT(pt);
+		}
+
+		scratch[i] = err;
 		crc = _crc_ibutton_update(crc, scratch[i]);
 	}
 
@@ -101,18 +146,18 @@ static PT_THREAD(read_temp(struct pt *pt)) {
 	}
 
 	// Convert temperature to floating point
-	uint16_t rawtemp = scratch[0] | (scratch[1] << 8);
-	float temp = (float)rawtemp / 16.0F;
+	int16_t rawtemp = scratch[0] | (scratch[1] << 8);
+	float temp = (float)rawtemp * 0.0625;
 
 	printf_P(
 		PSTR("Scratchpad: %02x%02x %02x%02x %02x %02x%02x%02x %02x\n"),
-		scratch[8], scratch[7], // temperature
-		scratch[6], scratch[5], // TH,TL alarm thresholds
+		scratch[0], scratch[1], // temperature
+		scratch[2], scratch[3], // TH,TL alarm thresholds
 		scratch[4], // config
-		scratch[3], scratch[2], scratch[1], // reserved
-		scratch[0]); // CRC
+		scratch[5], scratch[6], scratch[7], // reserved
+		scratch[8]); // CRC
 
-	printf_P(PSTR("Temp Float: %0.2f\n"), temp);
+	printf_P(PSTR("Reading: %0.2fC\n"), temp);
 
 	PT_END(pt);
 }
@@ -157,14 +202,15 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 
 		if (s.rom_no[0] == 0x28) {
 			memcpy(sensor, s.rom_no, sizeof(sensor));
+
+			printf_P(PSTR("Reading temperature...\n"));
+			PROCESS_PT_SPAWN(&ow_pt, read_temp(&ow_pt));
 		}
 
 		err = ow_search_next(&s);
 	} while (err != 0);
 
 	printf_P(PSTR("Search complete.\n"));
-
-	PROCESS_PT_SPAWN(&ow_pt, read_temp(&ow_pt));
 
 	PROCESS_END();
 }
