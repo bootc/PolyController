@@ -94,27 +94,6 @@ static int ds2482_write_config(void);
 static int ds2482_search_triplet(int search_direction);
 
 /*
- * Send 1 bit of communication to the 1-Wire Net and return the
- * result 1 bit read from the 1-Wire Net.
- *
- * Return:
- *   0 - bit value 0 read
- *   1 - bit value 1 read
- *  -1 - failure
- */
-static int ow_touch_bit(uint8_t bit);
-
-/*
- * Send 8 bits of communication to the 1-Wire Net and return the
- * result 8 bits read from the 1-Wire Net.
- *
- * Return:
- *  0x00:0xff - byte value read
- *  -1        - failure
- */
-static int ow_touch_byte(uint8_t byte);
-
-/*
  * The 'ow_search' function does a general search. This function
  * continues from the previous search state. The search state
  * can be reset by using the 'ow_first' function.
@@ -399,7 +378,7 @@ int ow_read_bit(void) {
 	return ow_touch_bit(0x01);
 }
 
-static int ow_touch_bit(uint8_t sendbit) {
+int ow_touch_bit(uint8_t sendbit) {
 	uint8_t status;
 	int poll_count = 0;
 
@@ -456,6 +435,31 @@ static int ow_touch_bit(uint8_t sendbit) {
 }
 
 int ow_write_byte(uint8_t sendbyte) {
+	int ret = ow_touch_byte(sendbyte);
+	if (ret != sendbyte) {
+		return -1;
+	}
+
+	return 0;
+}
+
+int ow_read_byte(void) {
+	return ow_touch_byte(0xff);
+}
+
+int ow_block(uint8_t *tran_buf, int tran_len) {
+	for (int i = 0; i < tran_len; i++) {
+		int ret = ow_touch_byte(tran_buf[i]);
+		if (ret < 0) {
+			return ret;
+		}
+		tran_buf[i] = ret;
+	}
+
+	return 0;
+}
+
+int ow_touch_byte(uint8_t sendbyte) {
 	uint8_t status;
 	int poll_count = 0;
 
@@ -502,55 +506,6 @@ int ow_write_byte(uint8_t sendbyte) {
 		return -1;
 	}
 
-	return 0;
-}
-
-int ow_read_byte(void) {
-	uint8_t data, status;
-	int poll_count = 0;
-
-	/*
-	 * 1-Wire Read Bytes (Case C)
-	 *   S AD,0 [A] 1WRB [A] Sr AD,1 [A] [Status] A [Status] A\
-	 *                                   \--------/
-	 *                     Repeat until 1WB bit has changed to 0
-	 *   Sr AD,0 [A] SRP [A] E1 [A] Sr AD,1 [A] DD A\ P
-	 *
-	 *  [] indicates from slave
-	 *  DD data read
-	 */
-
-	if (i2c_start(s.addr | I2C_WRITE)) {
-		return -1;
-	}
-	if (i2c_write(CMD_1WRB)) {
-		return -1;
-	}
-	if (i2c_rep_start(s.addr | I2C_READ)) {
-		return -1;
-	}
-
-	// loop checking 1WB bit for completion of 1-Wire operation
-	// abort if poll limit reached
-	status = i2c_read(1);
-	while (status & STATUS_1WB) {
-		if (poll_count++ >= POLL_LIMIT) {
-			break;
-		}
-
-		_delay_us(20);
-		status = i2c_read(status & STATUS_1WB);
-	}
-
-	// check for failure due to poll limit reached
-	if (status & STATUS_1WB) {
-		i2c_stop();
-
-		// handle error
-		ds2482_reset();
-		return -1;
-	}
-
 	if (i2c_rep_start(s.addr | I2C_WRITE)) {
 		return -1;
 	}
@@ -564,35 +519,10 @@ int ow_read_byte(void) {
 		return -1;
 	}
 
-	data =  i2c_read(0);
+	sendbyte =  i2c_read(0);
 	i2c_stop();
 
-	return data;
-}
-
-int ow_block(uint8_t *tran_buf, int tran_len) {
-	for (int i = 0; i < tran_len; i++) {
-		int ret = ow_touch_byte(tran_buf[i]);
-		if (ret < 0) {
-			return ret;
-		}
-		tran_buf[i] = ret;
-	}
-
-	return 0;
-}
-
-static int ow_touch_byte(uint8_t sendbyte) {
-	if (sendbyte == 0xFF) {
-		return ow_read_byte();
-	}
-	else {
-		int ret = ow_write_byte(sendbyte);
-		if (ret < 0) {
-			return ret;
-		}
-		return sendbyte;
-	}
+	return sendbyte;
 }
 
 int ow_presence(ow_addr_t addr) {

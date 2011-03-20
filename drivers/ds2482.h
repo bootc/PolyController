@@ -127,6 +127,27 @@ int ow_read_byte(void);
  */
 int ow_block(uint8_t *buf, int len);
 
+/*
+ * Send 1 bit of communication to the 1-Wire Net and return the
+ * result 1 bit read from the 1-Wire Net.
+ *
+ * Return:
+ *   0 - bit value 0 read
+ *   1 - bit value 1 read
+ *  -1 - failure
+ */
+int ow_touch_bit(uint8_t bit);
+
+/*
+ * Send 8 bits of communication to the 1-Wire Net and return the
+ * result 8 bits read from the 1-Wire Net.
+ *
+ * Return:
+ *  0x00:0xff - byte value read
+ *  -1        - failure
+ */
+int ow_touch_byte(uint8_t byte);
+
 // 1-wire search functions
 
 /*
