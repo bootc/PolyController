@@ -1,7 +1,5 @@
 
-* Bootloader
- * Check EEPROM at every reboot
- * Slightly longer initial boot delay
+* HC595 test
 
 * Command-line CFS/PolyFS peeking
 * Command-line 1-wire peeking
@@ -17,6 +15,7 @@
 
 * NTP server from DHCP/config
 * Syslog server from DHCP/config
+
 * OWFS client (to pull values from owfs)
 * PID controller
 * Scheduling/calendar tool
@@ -27,4 +26,3 @@
 
 Maybes?
 ? xAP node thingy
-
