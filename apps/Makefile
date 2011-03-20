@@ -2,6 +2,7 @@
 $(curdir)-$(CONFIG_APPS_DHCP) += dhcp.c
 $(curdir)-$(CONFIG_APPS_MONITOR) += monitor.c
 $(curdir)-$(CONFIG_APPS_NETWORK) += network.c
+$(curdir)-$(CONFIG_APPS_OWFSD) += owfsd.c
 $(curdir)-$(CONFIG_APPS_RESOLV) += resolv.c
 $(curdir)-$(CONFIG_APPS_SERIAL) += serial.c
 $(curdir)-$(CONFIG_APPS_SERIAL_SHELL) += serial-shell.c
