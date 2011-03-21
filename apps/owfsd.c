@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <contiki-net.h>
+#include <sys/stimer.h>
 #include <init.h>
 #include <util/delay.h>
 #include "syslog.h"
@@ -38,7 +39,7 @@
 #endif /* CONFIG_APPS_OWFSD_MAX_CONNS */
 
 struct owfsd_state {
-	struct timer timer;
+	struct stimer timer;
 	struct psock sock;
 	struct pt pt;
 	uint8_t buf_in[OW_BUFLEN];
@@ -57,7 +58,6 @@ static PT_THREAD(read_bytes(struct psock *sin, uint8_t len)) {
 
 	if (len > OW_BUFLEN) {
 		printf_P(PSTR("owfsd: read length overrun\n"));
-		uip_abort();
 		PSOCK_CLOSE_EXIT(sin);
 	}
 
@@ -68,7 +68,6 @@ static PT_THREAD(read_bytes(struct psock *sin, uint8_t len)) {
 	// Check length
 	if (PSOCK_DATALEN(sin) != len) {
 		printf_P(PSTR("owfsd: read len fail\n"));
-		uip_abort();
 		PSOCK_CLOSE_EXIT(sin);
 	}
 
@@ -85,10 +84,19 @@ static PT_THREAD(send_response(struct owfsd_state *s)) {
 	PSOCK_END(&s->sock);
 }
 
+static PT_THREAD(conn_abort(struct psock *sin)) {
+	PSOCK_BEGIN(sin);
+	PSOCK_CLOSE_EXIT(sin);
+	PSOCK_END(sin);
+}
+
 static int cmd_reset(struct owfsd_state *s) {
 	// Reset the bus
 	int ret = ow_reset();
-	if (ret < 0) {
+	if (ret == -2) {
+		printf_P(PSTR("owfsd: bus short detected\n"));
+	}
+	else if (ret < 0) {
 		printf_P(PSTR("owfsd: bus reset failed\n"));
 		return -1;
 	}
@@ -191,12 +199,12 @@ static PT_THREAD(handle_connection(struct owfsd_state *s)) {
 		// Make sure the length isn't too long
 		if (s->len >= OW_BUFLEN) {
 			printf_P(PSTR("owfsd: too long!\n"));
-			uip_abort();
+			PT_WAIT_THREAD(&s->pt, conn_abort(&s->sock));
 			PT_EXIT(&s->pt);
 		}
 		else if (s->len == 0) {
 			printf_P(PSTR("owfsd: too short!\n"));
-			uip_abort();
+			PT_WAIT_THREAD(&s->pt, conn_abort(&s->sock));
 			PT_EXIT(&s->pt);
 		}
 
@@ -227,13 +235,12 @@ static PT_THREAD(handle_connection(struct owfsd_state *s)) {
 			ret = cmd_byte_pu(s);
 		}
 		else {
-			uip_abort();
+			PT_WAIT_THREAD(&s->pt, conn_abort(&s->sock));
 			PT_EXIT(&s->pt);
 		}
 
 		// Check command result
 		if (ret) {
-			printf_P(PSTR("owfsd: resetting due to bad return\n"));
 			uip_abort();
 			PT_EXIT(&s->pt);
 		}
@@ -278,7 +285,7 @@ static void owfsd_appcall(void *state) {
 
 		// Set up the connection
 		tcp_markconn(uip_conn, s);
-		timer_set(&s->timer, CLOCK_SECOND * 60);
+		stimer_set(&s->timer, 60 * 2);
 		PSOCK_INIT(&s->sock, s->buf_in, OW_BUFLEN);
 		PT_INIT(&s->pt);
 
@@ -287,7 +294,7 @@ static void owfsd_appcall(void *state) {
 	}
 	else if (s != NULL) {
 		if (uip_poll()) {
-			if (timer_expired(&s->timer)) {
+			if (stimer_expired(&s->timer)) {
 				uip_abort();
 
 				// Free state data
@@ -302,7 +309,7 @@ static void owfsd_appcall(void *state) {
 			}
 		}
 		else {
-			timer_restart(&s->timer);
+			stimer_restart(&s->timer);
 		}
 
 		if (s) {
