@@ -1,6 +1,6 @@
 
 * owfs code
- * Handle errors
+ * Handle errors better (?)
 
 * owfsd
  * DS2409 fixups (?)
@@ -8,7 +8,6 @@
  * Inquiry/Capabilities command (model, version, max buffer size)
 
 * Command-line CFS/PolyFS peeking
- * Rewrite cat
  * CRC/verify code command
 * Command-line 1-wire peeking. Commands for:
  * Search, alarm search, presence

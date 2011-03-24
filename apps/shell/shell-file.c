@@ -141,80 +141,46 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 
 PROCESS_THREAD(shell_cat_process, ev, data) {
 	static int fd = 0;
-	char *next;
-	char filename[MAX_FILENAME_LEN];
-	int len;
-	int offset = 0;
-	static int block_size = MAX_BLOCKSIZE;
 	PROCESS_EXITHANDLER(cfs_close(fd));
 	PROCESS_BEGIN();
 
-	if(data != NULL) {
-		next = strchr(data, ' ');
-		if(next == NULL) {
-			strncpy(filename, data, sizeof(filename));
-		} else {
-			len = (int)(next - (char *)data);
-			if (len <= 0) {
-				shell_output_P(&cat_command,
-					PSTR("read: filename too short: %s\n"), data);
-				PROCESS_EXIT();
-			}
-			if (len > MAX_FILENAME_LEN) {
-				shell_output_P(&cat_command,
-					PSTR("read: filename too long: %s\n"), data);
-				PROCESS_EXIT();
-			}
-			memcpy(filename, data, len);
-			filename[len] = 0;
+	if (data == NULL || !strlen(data)) {
+		shell_output_P(&cat_command,
+			PSTR("Usage: cat <file>\n"));
+		PROCESS_EXIT();
+	}
 
-			offset = shell_strtolong(next, NULL);
-			next++;
-			next = strchr(next, ' ');
-			if(next != NULL) {
-				block_size = shell_strtolong(next, NULL);
-				if(block_size > MAX_BLOCKSIZE) {
-					shell_output_P(&cat_command,
-						PSTR("read: block size too large: %s\n"), data);
-					PROCESS_EXIT();
-				}
-			}
+	fd = cfs_open(data, CFS_READ);
+	if (fd < 0) {
+		shell_output_P(&cat_command,
+			PSTR("cat: could not open file for reading: %s\n"), data);
+	}
+
+	while(1) {
+		char buf[MAX_BLOCKSIZE + 1];
+		int len;
+		struct shell_input *input;
+
+		len = cfs_read(fd, buf, MAX_BLOCKSIZE);
+		if (len <= 0) {
+			cfs_close(fd);
+			PROCESS_EXIT();
 		}
 
-		fd = cfs_open(filename, CFS_READ);
-		cfs_seek(fd, offset, CFS_SEEK_SET);
+		buf[len] = '\0';
+		shell_output_P(&cat_command,
+			PSTR("%s"), buf);
 
-		if(fd < 0) {
-			shell_output_P(&cat_command,
-				PSTR("read: could not open file for reading: %s\n"), filename);
-		} else {
+		process_post(&shell_cat_process, PROCESS_EVENT_CONTINUE, NULL);
+		PROCESS_WAIT_EVENT_UNTIL(
+			ev == PROCESS_EVENT_CONTINUE ||
+			ev == shell_event_input);
 
-			while(1) {
-				char buf[MAX_BLOCKSIZE + 1];
-				int len;
-				struct shell_input *input;
-
-				len = cfs_read(fd, buf, block_size);
-				if (len <= 0) {
-					cfs_close(fd);
-					PROCESS_EXIT();
-				}
-				buf[len] = '\0';
-				shell_output_P(&cat_command,
-					PSTR("%s"), buf);
-
-				process_post(&shell_cat_process, PROCESS_EVENT_CONTINUE, NULL);
-				PROCESS_WAIT_EVENT_UNTIL(ev == PROCESS_EVENT_CONTINUE ||
-						ev == shell_event_input);
-
-				if(ev == shell_event_input) {
-					input = data;
-					/*    printf("cat input %d %d\n", input->len1, input->len2);*/
-					if(input->len1 + input->len2 == 0) {
-						cfs_close(fd);
-						PROCESS_EXIT();
-					}
-				}
+		if (ev == shell_event_input) {
+			input = data;
+			if (input->len1 + input->len2 == 0) {
+				cfs_close(fd);
+				PROCESS_EXIT();
 			}
 		}
 	}
