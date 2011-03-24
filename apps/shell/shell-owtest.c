@@ -167,12 +167,6 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 
 	PROCESS_BEGIN();
 
-	err = ds2482_detect(0x30);
-	if (err) {
-		printf_P(PSTR("Detect failed.\n"));
-		PROCESS_EXIT();
-	}
-
 	err = ow_reset();
 	if (err < 0) {
 		printf_P(PSTR("Bus reset failed.\n"));
