@@ -39,12 +39,12 @@ PROCESS_THREAD(shell_rlytest_process, ev, data) {
 
 	if ((data == NULL) || (strlen(data) != 4)) {
 		shell_output_P(&rlytest_command,
-			PSTR("Usage: rlytest <1234>"));
+			PSTR("Usage: rlytest <1234>\n"));
 		shell_output_P(&rlytest_command,
 			PSTR("<1234> is a binary string representing "
-				"the state of the relays"));
+				"the state of the relays\n"));
 		shell_output_P(&rlytest_command,
-			PSTR("Example: rlytest 1011"));
+			PSTR("Example: rlytest 1011\n"));
 
 		PROCESS_EXIT();
 	}

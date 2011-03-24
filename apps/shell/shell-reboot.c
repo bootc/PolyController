@@ -53,6 +53,8 @@ INIT_SHELL_COMMAND(reboot_command);
 PROCESS_THREAD(shell_reboot_process, ev, data) {
 	PROCESS_BEGIN();
 
+	shell_output_P(&reboot_command, PSTR("Rebooting...\n"));
+
 	wdt_enable(WDTO_15MS);
 	while (1);
 

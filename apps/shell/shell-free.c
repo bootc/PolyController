@@ -86,31 +86,31 @@ PROCESS_THREAD(shell_free_process, ev, data) {
 
 	// Print header
 	shell_output_P(&shell_free_command,
-		PSTR("           total        used        free"));
+		PSTR("           total        used        free\n"));
 
 	// Static memory
 	shell_output_P(&shell_free_command,
-		PSTR("Static:    %5u           -           -"),
+		PSTR("Static:    %5u           -           -\n"),
 		static_end - static_start + 1);
 
 	// Heap memory
 	shell_output_P(&shell_free_command,
-		PSTR("Heap:      %5u       %5u       %5u"),
+		PSTR("Heap:      %5u       %5u       %5u\n"),
 		heap_end - heap_start + 1,
 		heap_end - heap_start + 1 - heap_free,
 		heap_free);
 
 	// Stack memory
 	shell_output_P(&shell_free_command,
-		PSTR("Stack:     %5u       %5u       %5u"),
+		PSTR("Stack:     %5u       %5u       %5u\n"),
 		stack_end - stack_start + 1,
 		stack_end - stack_start + 1 - stack_free,
 		stack_free);
 
 #if PROCESS_CONF_STATS
 	// Process event stats
-	shell_output_P(&shell_free_command, PSTR(""));
-	shell_output_P(&shell_free_command, PSTR("Max Events: %u"),
+	shell_output_P(&shell_free_command, PSTR("\n"));
+	shell_output_P(&shell_free_command, PSTR("Max Events: %u\n"),
 		process_maxevents);
 #endif
 

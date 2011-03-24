@@ -54,9 +54,9 @@ PROCESS_THREAD(shell_ps_process, ev, data) {
 	struct process *p;
 	PROCESS_BEGIN();
 
-	shell_output_P(&ps_command, PSTR("Processes:"));
+	shell_output_P(&ps_command, PSTR("Processes:\n"));
 	for (p = PROCESS_LIST(); p != NULL; p = p->next) {
-		shell_output_P(&ps_command, PSTR("%S"), p->name);
+		shell_output_P(&ps_command, PSTR("%S\n"), p->name);
 	}
 
 	PROCESS_END();

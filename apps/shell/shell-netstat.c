@@ -91,16 +91,14 @@ static const char *states[] PROGMEM = {
 
 extern u16_t uip_listenports[UIP_LISTENPORTS];
 
-/*---------------------------------------------------------------------------*/
 PROCESS(shell_netstat_process, "netstat");
 SHELL_COMMAND(netstat_command,
 		"netstat",
 		"netstat: show UDP and TCP connections",
 		&shell_netstat_process);
 INIT_SHELL_COMMAND(netstat_command);
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(shell_netstat_process, ev, data)
-{
+
+PROCESS_THREAD(shell_netstat_process, ev, data) {
 	int i;
 	struct uip_conn *conn;
 	PROCESS_BEGIN();
@@ -108,7 +106,7 @@ PROCESS_THREAD(shell_netstat_process, ev, data)
 	for(i = 0; i < UIP_CONNS; ++i) {
 		conn = &uip_conns[i];
 		shell_output_P(&netstat_command,
-			PSTR("TCP %u, %u.%u.%u.%u:%u, %S, %u, %u, %c %c"),
+			PSTR("TCP %u, %u.%u.%u.%u:%u, %S, %u, %u, %c %c\n"),
 			uip_htons(conn->lport),
 			conn->ripaddr.u8[0],
 			conn->ripaddr.u8[1],
@@ -125,7 +123,7 @@ PROCESS_THREAD(shell_netstat_process, ev, data)
 	for (i = 0; i < UIP_UDP_CONNS; i++) {
 		struct uip_udp_conn *udp = &uip_udp_conns[i];
 		shell_output_P(&netstat_command,
-			PSTR("UDP %u, %u.%u.%u.%u:%u"),
+			PSTR("UDP %u, %u.%u.%u.%u:%u\n"),
 			uip_htons(udp->lport),
 			udp->ripaddr.u8[0],
 			udp->ripaddr.u8[1],
@@ -134,9 +132,9 @@ PROCESS_THREAD(shell_netstat_process, ev, data)
 			uip_htons(udp->rport));
 	}
 
-	shell_output_P(&netstat_command, PSTR("Listen ports:"));
+	shell_output_P(&netstat_command, PSTR("Listen ports:\n"));
 	for (i = 0; i < UIP_LISTENPORTS; i++) {
-		shell_output_P(&netstat_command, PSTR("%d"),
+		shell_output_P(&netstat_command, PSTR("%d\n"),
 			UIP_HTONS(uip_listenports[i]));
 	}
 

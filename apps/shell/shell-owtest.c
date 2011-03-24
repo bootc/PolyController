@@ -49,20 +49,20 @@ static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 	// Reset the bus
 	err = ow_reset();
 	if (err != 1) {
-		printf_P(PSTR("Reset failed.\n"));
+		shell_output_P(&owtest_command, PSTR("Reset failed.\n"));
 		PT_EXIT(pt);
 	}
 
 	// Match ROM
 	err = ow_write_byte(0x55);
 	if (err) {
-		printf_P(PSTR("Match ROM failed\n"));
+		shell_output_P(&owtest_command, PSTR("Match ROM failed\n"));
 		PT_EXIT(pt);
 	}
 	for (int i = 0; i < sizeof(*addr); i++) {
 		err = ow_write_byte(addr->u[i]);
 		if (err) {
-			printf_P(PSTR("Match ROM failed\n"));
+			shell_output_P(&owtest_command, PSTR("Match ROM failed\n"));
 			PT_EXIT(pt);
 		}
 	}
@@ -70,7 +70,7 @@ static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 	// Start temperature conversion
 	err = ow_write_byte(0x44);
 	if (err) {
-		printf_P(PSTR("Convert T failed\n"));
+		shell_output_P(&owtest_command, PSTR("Convert T failed\n"));
 		PT_EXIT(pt);
 	}
 
@@ -87,11 +87,11 @@ static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 			break;
 		}
 		else if (ret == -1) {
-			printf_P(PSTR("Read status failed.\n"));
+			shell_output_P(&owtest_command, PSTR("Read status failed.\n"));
 			PT_EXIT(pt);
 		}
 		else if (timer_expired(&timeout)) {
-			printf_P(PSTR("Conversion has taken too long. Giving up.\n"));
+			shell_output_P(&owtest_command, PSTR("Conversion has taken too long. Giving up.\n"));
 			PT_EXIT(pt);
 		}
 
@@ -103,20 +103,20 @@ static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 	// Reset and MATCH ROM again
 	err = ow_reset();
 	if (err != 1) {
-		printf_P(PSTR("Reset failed.\n"));
+		shell_output_P(&owtest_command, PSTR("Reset failed.\n"));
 		PT_EXIT(pt);
 	}
 
 	// Match ROM
 	err = ow_write_byte(0x55);
 	if (err) {
-		printf_P(PSTR("Match ROM failed\n"));
+		shell_output_P(&owtest_command, PSTR("Match ROM failed\n"));
 		PT_EXIT(pt);
 	}
 	for (int i = 0; i < sizeof(*addr); i++) {
 		err = ow_write_byte(addr->u[i]);
 		if (err) {
-			printf_P(PSTR("Match ROM failed\n"));
+			shell_output_P(&owtest_command, PSTR("Match ROM failed\n"));
 			PT_EXIT(pt);
 		}
 	}
@@ -124,14 +124,14 @@ static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 	// Read the scratch pad
 	err = ow_write_byte(0xBE);
 	if (err) {
-		printf_P(PSTR("Read scratch pad failed\n"));
+		shell_output_P(&owtest_command, PSTR("Read scratch pad failed\n"));
 		PT_EXIT(pt);
 	}
 
 	for (int i = 0; i < sizeof(scratch); i++) {
 		err = ow_read_byte();
 		if (err < 0) {
-			printf_P(PSTR("Read byte failed\n"));
+			shell_output_P(&owtest_command, PSTR("Read byte failed\n"));
 			PT_EXIT(pt);
 		}
 
@@ -141,7 +141,7 @@ static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 
 	// Make sure the CRC is valid
 	if (crc) {
-		printf_P(PSTR("CRC check failed!\n"));
+		shell_output_P(&owtest_command, PSTR("CRC check failed!\n"));
 		PT_EXIT(pt);
 	}
 
@@ -149,7 +149,7 @@ static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 	int16_t rawtemp = scratch[0] | (scratch[1] << 8);
 	float temp = (float)rawtemp * 0.0625;
 
-	printf_P(
+	shell_output_P(&owtest_command, 
 		PSTR("Scratchpad: %02x%02x %02x%02x %02x %02x%02x%02x %02x\n"),
 		scratch[0], scratch[1], // temperature
 		scratch[2], scratch[3], // TH,TL alarm thresholds
@@ -157,7 +157,7 @@ static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 		scratch[5], scratch[6], scratch[7], // reserved
 		scratch[8]); // CRC
 
-	printf_P(PSTR("Reading: %0.2fC\n"), temp);
+	shell_output_P(&owtest_command, PSTR("Reading: %0.2fC\n"), temp);
 
 	PT_END(pt);
 }
@@ -169,32 +169,32 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 
 	err = ow_reset();
 	if (err < 0) {
-		printf_P(PSTR("Bus reset failed.\n"));
+		shell_output_P(&owtest_command, PSTR("Bus reset failed.\n"));
 		PROCESS_EXIT();
 	}
 	else if (err == 0) {
-		printf_P(PSTR("No presence detected.\n"));
+		shell_output_P(&owtest_command, PSTR("No presence detected.\n"));
 		PROCESS_EXIT();
 	}
 
 	err = ow_search_first(&search, 0);
 	do {
 		if (err < 0) {
-			printf_P(PSTR("Search error: %d\n"), err);
+			shell_output_P(&owtest_command, PSTR("Search error: %d\n"), err);
 			PROCESS_EXIT();
 		}
 		else if (err == 0) {
-			printf_P(PSTR("No devices found.\n"));
+			shell_output_P(&owtest_command, PSTR("No devices found.\n"));
 			break;
 		}
 
-		printf_P(PSTR("Found: %02x.%02x%02x%02x%02x%02x%02x\n"),
+		shell_output_P(&owtest_command, PSTR("Found: %02x.%02x%02x%02x%02x%02x%02x\n"),
 			search.rom_no.family, // family code
 			search.rom_no.id[0], search.rom_no.id[1], search.rom_no.id[2],
 			search.rom_no.id[3], search.rom_no.id[4], search.rom_no.id[5]);
 
 		if (search.rom_no.family == 0x28) {
-			printf_P(PSTR("Reading temperature...\n"));
+			shell_output_P(&owtest_command, PSTR("Reading temperature...\n"));
 			PROCESS_PT_SPAWN(&ow_pt, read_temp(&ow_pt, &search.rom_no));
 		}
 
@@ -205,7 +205,7 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 		err = ow_search_next(&search);
 	} while (1);
 
-	printf_P(PSTR("Search complete.\n"));
+	shell_output_P(&owtest_command, PSTR("Search complete.\n"));
 
 	PROCESS_END();
 }

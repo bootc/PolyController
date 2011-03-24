@@ -1,8 +1,3 @@
-/**
- * \addtogroup shell
- * @{
- */
-
 /*
  * Copyright (c) 2008, Swedish Institute of Computer Science.
  * All rights reserved.
@@ -53,38 +48,33 @@
 
 #include "shell/shell.h"
 
-/*---------------------------------------------------------------------------*/
 PROCESS(serial_shell_process, "Serial Shell");
 INIT_PROCESS(serial_shell_process);
-/*---------------------------------------------------------------------------*/
+
 void shell_default_output(PGM_P fmt, va_list args) {
-	printf_P(PSTR("\r\x1b[2K"));
 	vfprintf_P(stdout, fmt, args);
-	printf_P(PSTR("\n"));
 }
-/*---------------------------------------------------------------------------*/
+
 void shell_prompt_P(PGM_P str) {
 #if CONFIG_LIB_CONTIKI_IPV6
-	printf_P(PSTR("\r\x1b[2K\x1b[01;34m%S\x1b[00m"),
-		str);
+	printf_P(PSTR("\r\x1b[2K\x1b[01;34m%S\x1b[00m"), str);
 #else
 	printf_P(PSTR("\r\x1b[2K\x1b[01;34m%d.%d: %S\x1b[00m"),
 		uip_hostaddr.u8[2], uip_hostaddr.u8[3], str);
 #endif
 }
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(serial_shell_process, ev, data)
-{
+
+PROCESS_THREAD(serial_shell_process, ev, data) {
 	PROCESS_BEGIN();
 
 	shell_init();
 
 	while(1) {
-		PROCESS_WAIT_EVENT_UNTIL(ev == serial_line_event_message && data != NULL);
+		PROCESS_WAIT_EVENT_UNTIL(
+			ev == serial_line_event_message && data != NULL);
 		shell_input(data, strlen(data));
 	}
 
 	PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
-/** @} */
+

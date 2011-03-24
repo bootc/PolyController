@@ -37,11 +37,6 @@
 #include <avr/interrupt.h>
 #endif
 
-#if !CONFIG_IMAGE_BOOTLOADER
-#include <avr/pgmspace.h>
-#include <stdio.h>
-#endif
-
 #include "drivers/dataflash.h"
 #include "flashmgt.h"
 
@@ -192,8 +187,6 @@ int flashmgt_sec_write_start(void) {
 		return -1;
 	}
 
-	printf_P(PSTR("Unlocking...\n"));
-
 	// Allow us to change SREG
 	ret = dataflash_write_enable();
 	if (ret) {
@@ -248,8 +241,6 @@ int flashmgt_sec_write_start(void) {
 		return ret;
 	}
 
-	printf_P(PSTR("Erasing: "));
-
 	// Now erase the partition
 	addr = part[sec].start;
 	while (addr <= part[sec].end) {
@@ -285,15 +276,11 @@ int flashmgt_sec_write_start(void) {
 		// Wait for the erase to complete
 		dataflash_wait_ready();
 
-		printf_P(PSTR("."));
-
 #if CONFIG_WATCHDOG
 		// Poke the watchdog
 		wdt_reset();
 #endif
 	}
-
-	printf_P(PSTR(" done!\n"));
 
 	// OK to carry on with writes
 	flags.sec_write_ready = 1;
@@ -335,8 +322,6 @@ int flashmgt_sec_write_block(const void *buf, uint32_t offset, uint32_t len) {
 
 		// Wait for the write to complete
 		dataflash_wait_ready();
-
-		printf_P(PSTR("."));
 
 #if CONFIG_WATCHDOG
 		// Poke the watchdog
@@ -390,8 +375,6 @@ int flashmgt_sec_write_abort(void) {
 	if (ret != SETTINGS_STATUS_OK) {
 		return -1;
 	}
-
-	printf_P(PSTR("\nWRITE ABORTED\n"));
 
 	return 0;
 }
@@ -473,8 +456,6 @@ out:
 	if (ret2 != SETTINGS_STATUS_OK) {
 		ret = ret2;
 	}
-
-	printf_P(PSTR("\n"));
 
 	return ret;
 }

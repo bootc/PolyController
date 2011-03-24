@@ -39,7 +39,8 @@ PROCESS_THREAD(shell_log_process, ev, data) {
 
 	msg = data;
 	if (msg == NULL || strlen(msg) == 0) {
-		shell_output_P(&shell_log_command, PSTR("Usage: log <message>"));
+		shell_output_P(&shell_log_command,
+			PSTR("Usage: log <message>\n"));
 		PROCESS_EXIT();
 	}
 

@@ -52,7 +52,7 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 		strftime_P(date, DATE_MAXLEN, PSTR("%c"), &tm);
 		
 		shell_output_P(&shell_date_command,
-			PSTR("%s"), date);
+			PSTR("%s\n"), date);
 
 		free(date);
 	}
@@ -61,11 +61,11 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 			timesync_schedule_resync();
 			PROCESS_WAIT_EVENT_UNTIL(ev == timesync_event);
 			shell_output_P(&shell_date_command,
-				PSTR("Time was adjusted."));
+				PSTR("Time was adjusted.\n"));
 		}
 		else {
 			shell_output_P(&shell_date_command,
-				PSTR("TimeSync not running."));
+				PSTR("TimeSync not running.\n"));
 		}
 	}
 	else if (strcmp_P(data, PSTR("--frac")) == 0) {
@@ -75,12 +75,12 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 		uint32_t ms = ((uint32_t)time.frac * 1000) >> 12;
 
 		shell_output_P(&shell_date_command,
-			PSTR("Fractional time (secs since epoch): %ld.%03lus"),
+			PSTR("Fractional time (secs since epoch): %ld.%03lus\n"),
 			time.sec, ms);
 	}
 	else {
 		shell_output_P(&shell_date_command,
-			PSTR("Usage: date [--sync|--frac]"));
+			PSTR("Usage: date [--sync|--frac]\n"));
 	}
 
 	PROCESS_END();

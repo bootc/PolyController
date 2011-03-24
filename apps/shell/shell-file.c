@@ -73,7 +73,8 @@ static void print_inode(const char *name, const struct polyfs_inode *ino) {
 		'?'; // we won't use more than this
 
 	// Print the directory entry
-	shell_output_P(&ls_command, PSTR("%c %04o %9lu %5u:%-3u %s"),
+	shell_output_P(&ls_command,
+		PSTR("%c %04o %9lu %5u:%-3u %s\n"),
 		type,
 		ino->mode & ~S_IFMT,
 		(uint32_t)ino->size,
@@ -97,7 +98,8 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 	// Lookup directory
 	err = polyfs_lookup(polyfs_cfs_fs, data, &dir);
 	if (err < 0) {
-		shell_output_P(&ls_command, PSTR("Cannot lookup path: %s"), data);
+		shell_output_P(&ls_command,
+			PSTR("Cannot lookup path: %s\n"), data);
 		PROCESS_EXIT();
 	}
 
@@ -106,7 +108,8 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 		// Open the directory for reading
 		err = polyfs_opendir(polyfs_cfs_fs, &dir, &rd);
 		if (err < 0) {
-			shell_output_P(&ls_command, PSTR("Cannot read directory"));
+			shell_output_P(&ls_command,
+				PSTR("Cannot read directory\n"));
 			PROCESS_EXIT();
 		}
 
@@ -115,7 +118,8 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 			// Read the directory entry
 			err = polyfs_readdir(&rd);
 			if (err < 0) {
-				shell_output_P(&ls_command, PSTR("Readdir failed"));
+				shell_output_P(&ls_command,
+					PSTR("Readdir failed\n"));
 				PROCESS_EXIT();
 			}
 
@@ -151,14 +155,14 @@ PROCESS_THREAD(shell_cat_process, ev, data) {
 			strncpy(filename, data, sizeof(filename));
 		} else {
 			len = (int)(next - (char *)data);
-			if(len <= 0) {
+			if (len <= 0) {
 				shell_output_P(&cat_command,
-					PSTR("read: filename too short: %s"), data);
+					PSTR("read: filename too short: %s\n"), data);
 				PROCESS_EXIT();
 			}
-			if(len > MAX_FILENAME_LEN) {
+			if (len > MAX_FILENAME_LEN) {
 				shell_output_P(&cat_command,
-					PSTR("read: filename too long: %s"), data);
+					PSTR("read: filename too long: %s\n"), data);
 				PROCESS_EXIT();
 			}
 			memcpy(filename, data, len);
@@ -171,7 +175,7 @@ PROCESS_THREAD(shell_cat_process, ev, data) {
 				block_size = shell_strtolong(next, NULL);
 				if(block_size > MAX_BLOCKSIZE) {
 					shell_output_P(&cat_command,
-						PSTR("read: block size too large: %s"), data);
+						PSTR("read: block size too large: %s\n"), data);
 					PROCESS_EXIT();
 				}
 			}
@@ -182,19 +186,20 @@ PROCESS_THREAD(shell_cat_process, ev, data) {
 
 		if(fd < 0) {
 			shell_output_P(&cat_command,
-				PSTR("read: could not open file for reading: %s"), filename);
+				PSTR("read: could not open file for reading: %s\n"), filename);
 		} else {
 
 			while(1) {
-				char buf[MAX_BLOCKSIZE];
+				char buf[MAX_BLOCKSIZE + 1];
 				int len;
 				struct shell_input *input;
 
 				len = cfs_read(fd, buf, block_size);
-				if(len <= 0) {
+				if (len <= 0) {
 					cfs_close(fd);
 					PROCESS_EXIT();
 				}
+				buf[len] = '\0';
 				shell_output_P(&cat_command,
 					PSTR("%s"), buf);
 

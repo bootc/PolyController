@@ -102,7 +102,8 @@ PROCESS_THREAD(shell_null_process, ev, data)
 command_kill(struct shell_command *c)
 {
 	if(c != NULL) {
-		shell_output_P(&killall_command, PSTR("Stopping command %S"), c->command);
+		shell_output_P(&killall_command,
+			PSTR("Stopping command %S\n"), c->command);
 		process_exit(c->process);
 	}
 }
@@ -119,19 +120,16 @@ killall(void)
 		}
 	}
 }
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(shell_killall_process, ev, data)
-{
 
+PROCESS_THREAD(shell_killall_process, ev, data) {
 	PROCESS_BEGIN();
 
 	killall();
 
 	PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(shell_kill_process, ev, data)
-{
+
+PROCESS_THREAD(shell_kill_process, ev, data) {
 	struct shell_command *c;
 	char *name;
 	PROCESS_BEGIN();
@@ -139,43 +137,44 @@ PROCESS_THREAD(shell_kill_process, ev, data)
 	name = data;
 	if(name == NULL || strlen(name) == 0) {
 		shell_output_P(&kill_command,
-				PSTR("kill <command>: command name must be given"));
+			PSTR("kill <command>: command name must be given\n"));
 	}
 
 	for(c = list_head(commands);
-			c != NULL;
-			c = c->next) {
-		if(strcmp_P(name, c->command) == 0 &&
-				c != &kill_command &&
-				process_is_running(c->process)) {
+		c != NULL;
+		c = c->next)
+	{
+		if (strcmp_P(name, c->command) == 0 &&
+			c != &kill_command &&
+			process_is_running(c->process))
+		{
 			command_kill(c);
 			PROCESS_EXIT();
 		}
 	}
 
-	shell_output_P(&kill_command, PSTR("Command not found: "));
+	shell_output_P(&kill_command,
+		PSTR("Command not found: %s\n"), name);
 
 	PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(help_command_process, ev, data)
-{
+
+PROCESS_THREAD(help_command_process, ev, data) {
 	struct shell_command *c;
 	PROCESS_BEGIN();
 
-	shell_output_P(&help_command, PSTR("Available commands:"));
+	shell_output_P(&help_command, PSTR("Available commands:\n"));
 	for(c = list_head(commands);
-			c != NULL;
-			c = c->next) {
-		shell_output_P(&help_command, PSTR("%S"), c->description);
+		c != NULL;
+		c = c->next)
+	{
+		shell_output_P(&help_command, PSTR("%S\n"), c->description);
 	}
 
 	PROCESS_END();
 }
-/*---------------------------------------------------------------------------*/
-	static void
-replace_braces(char *commandline)
-{
+
+static void replace_braces(char *commandline) {
 	char *ptr;
 	int level = 0;
 
@@ -265,11 +264,11 @@ start_command(char *commandline, struct shell_command *child)
 			c = c->next);
 
 	if(c == NULL) {
-		shell_output_P(NULL, PSTR("%s: command not found (try 'help')"), commandline);
+		shell_output_P(NULL, PSTR("%s: command not found (try 'help')\n"), commandline);
 		command_kill(child);
 		c = NULL;
 	} else if(process_is_running(c->process) || child == c) {
-		shell_output_P(NULL, PSTR("%s: command already running"), commandline);
+		shell_output_P(NULL, PSTR("%s: command already running\n"), commandline);
 		c->child = NULL;
 		c = NULL;
 	} else {
@@ -541,8 +540,8 @@ shell_set_time(unsigned long seconds)
 	void
 shell_start(void)
 {
-	shell_output_P(NULL, PSTR("Contiki command shell"));
-	shell_output_P(NULL, PSTR("Type '?' and return for help"));
+	shell_output_P(NULL, PSTR("Contiki command shell\n"));
+	shell_output_P(NULL, PSTR("Type '?' and return for help\n"));
 	shell_prompt_P(PSTR("Contiki> "));
 }
 /*---------------------------------------------------------------------------*/
