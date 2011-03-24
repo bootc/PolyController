@@ -29,6 +29,10 @@
 #include <stdlib.h>
 #include "shell.h"
 
+static char progress[] PROGMEM = {
+	'-', '\\', '|', '/'
+};
+
 PROCESS(shell_tftpupdate_process, "tftpupdate");
 SHELL_COMMAND(shell_tftpupdate_command,
 	"tftpupdate", "tftpupdate: update firmware over TFTP",
@@ -69,11 +73,13 @@ static int tftpupdate_iofunc(struct tftp_state *s, uint32_t offset,
 	err = flashmgt_sec_write_block(buf, offset, size);
 	if (err) {
 		shell_output_P(&shell_tftpupdate_command,
-			PSTR("Write error %d at block %d\n"),
+			PSTR("\rWrite error %d at block %d\n"),
 			err, s->block);
 	}
 	else {
-		shell_output_P(&shell_tftpupdate_command, PSTR("."));
+		shell_output_P(&shell_tftpupdate_command,
+			PSTR("\r%c"),
+			pgm_read_byte(&progress[s->block % sizeof(progress)]));
 	}
 
 	return err;
@@ -197,7 +203,8 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 
 			if (tftpupdate->s.state == TFTP_STATE_CLOSE) {
 				shell_output_P(&shell_tftpupdate_command,
-					PSTR(" done!\n"));
+					PSTR("\rTransfer complete (%lu bytes read).\n"),
+					tftpupdate->s.size);
 
 				// Send final ACK
 				PROCESS_WAIT_EVENT();
@@ -205,7 +212,7 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 			}
 			else if (tftpupdate->s.state == TFTP_STATE_ERR) {
 				shell_output_P(&shell_tftpupdate_command,
-					PSTR("Aborting due to error.\n"));
+					PSTR("\rAborting due to error.\n"));
 
 				// Abort the flash write
 				flashmgt_sec_write_abort();
@@ -218,7 +225,7 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 			}
 			else if (tftpupdate->s.state == TFTP_STATE_TIMEOUT) {
 				shell_output_P(&shell_tftpupdate_command,
-					PSTR("Transfer timed out.\n"));
+					PSTR("\rTransfer timed out.\n"));
 
 				// Abort the flash write
 				flashmgt_sec_write_abort();
@@ -244,10 +251,6 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 			err);
 	}
 	else {
-		shell_output_P(&shell_tftpupdate_command,
-				PSTR("Transfer finished (%lu bytes read).\n"),
-				tftpupdate->s.size);
-
 		shell_output_P(&shell_tftpupdate_command,
 			PSTR("New firmware image is in flash. "
 				"Please reboot to apply the upgrade.\n"),
