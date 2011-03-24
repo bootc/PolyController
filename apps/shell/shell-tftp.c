@@ -210,6 +210,9 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 				shell_output_P(&shell_tftpupdate_command,
 					PSTR("Transfer timed out."));
 
+				// Abort the flash write
+				flashmgt_sec_write_abort();
+
 				// Make sure error message is sent
 				PROCESS_WAIT_EVENT();
 
