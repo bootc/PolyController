@@ -177,7 +177,7 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 		PROCESS_EXIT();
 	}
 
-	err = ow_search_first(&search);
+	err = ow_search_first(&search, 0);
 	do {
 		if (err < 0) {
 			printf_P(PSTR("Search error: %d\n"), err);

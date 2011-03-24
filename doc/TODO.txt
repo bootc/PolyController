@@ -1,12 +1,9 @@
 
 * owfs code
  * Handle errors
- * Length should not include command byte (only data)
- * Delays are multiples of 10ms not 500ms
 
 * owfsd
  * DS2409 fixups (?)
- * Alarm search
  * Bus locking
  * Inquiry/Capabilities command (model, version, max buffer size)
 

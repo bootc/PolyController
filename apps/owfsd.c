@@ -185,10 +185,10 @@ static int cmd_search(struct owfsd_state *s) {
 
 	// Set up the fields
 	memcpy(&src.rom_no, &s->pkt.buf.search.addr, sizeof(src.rom_no));
-	src.last_discrepancy = s->pkt.buf.search.flags;
+	src.last_discrepancy = s->pkt.buf.search.flags & 0x7f;
 	src.last_family_discrepancy = 0;
 	src.last_device_flag = 0;
-	// FIXME: alarm search
+	src.alarm = s->pkt.buf.search.flags & 0x80 ? 1 : 0;
 
 	int ret = ow_search_next(&src);
 	if (ret < 0) {

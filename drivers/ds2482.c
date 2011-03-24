@@ -546,11 +546,12 @@ int ow_presence(const ow_addr_t *addr) {
 	return res;
 }
 
-int ow_search_first(ow_search_t *se) {
+int ow_search_first(ow_search_t *se, uint8_t alarm) {
 	// reset the search state
 	se->last_discrepancy = 0;
 	se->last_device_flag = 0;
 	se->last_family_discrepancy = 0;
+	se->alarm = alarm ? 1 : 0;
 
 	return ow_search(se);
 }
@@ -560,11 +561,12 @@ int ow_search_next(ow_search_t *se) {
 	return ow_search(se);
 }
 
-int ow_search_target(ow_search_t *se, uint8_t family) {
+int ow_search_target(ow_search_t *se, uint8_t family, uint8_t alarm) {
 	memset(&se->rom_no, 0, sizeof(se->rom_no));
 	se->last_discrepancy = 64;
 	se->last_family_discrepancy = 0;
 	se->last_device_flag = 0;
+	se->alarm = alarm ? 1 : 0;
 
 	// set the search state to find SearchFamily type devices
 	se->rom_no.family = family;
@@ -583,6 +585,11 @@ int ow_search_skip_family(ow_search_t *se) {
 	if (se->last_discrepancy == 0) {
 		se->last_device_flag = 1;
 	}
+	else {
+		se->last_device_flag = 0;
+	}
+
+	se->alarm = 0;
 
 	return ow_search(se);
 }
@@ -618,7 +625,7 @@ static int ow_search(ow_search_t *se) {
 		}
 
 		// issue the search command
-		ret = ow_write_byte(0xF0);
+		ret = ow_write_byte(se->alarm ? 0xEC : 0xF0);
 		if (ret < 0) {
 			return ret;
 		}

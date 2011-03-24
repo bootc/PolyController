@@ -49,8 +49,9 @@ typedef struct {
 	ow_addr_t	rom_no;
 	uint8_t		last_discrepancy;
 	uint8_t		last_family_discrepancy;
-	uint8_t		last_device_flag;
 	uint8_t		crc;
+	uint8_t		last_device_flag : 1;
+	uint8_t		alarm : 1;
 } ow_search_t;
 
 // DS2482 specific functions
@@ -184,7 +185,7 @@ int ow_presence(const ow_addr_t *s);
  *  -1 - failure
  *  -2 - short detected
  */
-int ow_search_first(ow_search_t *s);
+int ow_search_first(ow_search_t *s, uint8_t alarm);
 
 /*
  * Find the 'next' devices on the 1-Wire network
@@ -206,7 +207,7 @@ int ow_search_next(ow_search_t *s);
  *  -1 - failure
  *  -2 - short detected
  */
-int ow_search_target(ow_search_t *s, uint8_t family);
+int ow_search_target(ow_search_t *s, uint8_t family, uint8_t alarm);
 
 /*
  * Find the next device skipping the last found family entirely.
