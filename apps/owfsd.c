@@ -27,10 +27,20 @@
 #include "syslog.h"
 #include "drivers/ds2482.h"
 
-#include <stdio.h>
-
 #define OWFSD_PORT 15862
-#define OW_BUFLEN 64
+
+#define CMD_RESET 'R'
+#define CMD_BYTES 'B'
+#define CMD_BITS 'b'
+#define CMD_SEARCH 'A'
+#define CMD_BYTE_SPU 'P'
+#define CMD_RET_ERROR 'E' // only used to send back to client
+
+#define ERR_OK 0
+#define ERR_INVALID 1 // invalid command or request size
+#define ERR_BUFSZ 2 // buffer too long, short read, etc...
+#define ERR_OWSD 3 // bus short detected
+#define ERR_OWERR 4 // general bus fault
 
 #ifndef CONFIG_APPS_OWFSD_MAX_CONNS
 #define MAX_CONNS (UIP_CONNS / 2)
@@ -38,14 +48,36 @@
 #define MAX_CONNS CONFIG_APPS_OWFSD_MAX_CONNS
 #endif /* CONFIG_APPS_OWFSD_MAX_CONNS */
 
+#ifndef CONFIG_APPS_OWFSD_BUFFER_SIZE
+#define OW_BUFLEN 64
+#else /* CONFIG_APPS_OWFSD_BUFFER_SIZE */
+#define OW_BUFLEN CONFIG_APPS_OWFSD_BUFFER_SIZE
+#endif /* CONFIG_APPS_OWFSD_BUFFER_SIZE */
+
+struct owfs_packet {
+	uint8_t len;
+	uint8_t cmd;
+	union {
+		uint8_t bytes[OW_BUFLEN];
+		struct {
+			ow_addr_t addr;
+			uint8_t flags;
+		} search;
+		struct {
+			uint8_t byte;
+			uint16_t delay;
+		} spu;
+		uint16_t error;
+	} buf;
+};
+
 struct owfsd_state {
 	struct stimer timer;
 	struct psock sock;
 	struct pt pt;
 	uint8_t buf_in[OW_BUFLEN];
-	uint8_t buf_out[OW_BUFLEN];
-	uint8_t len;
-	uint8_t cmd;
+	uint16_t status; // must remain a 16-bit unsigned int
+	struct owfs_packet pkt;
 };
 
 static uint8_t conns_free = MAX_CONNS;
@@ -53,25 +85,29 @@ static uint8_t conns_free = MAX_CONNS;
 PROCESS(owfsd_process, "owfsd");
 INIT_PROCESS(owfsd_process);
 
-static PT_THREAD(read_bytes(struct psock *sin, uint8_t len)) {
-	PSOCK_BEGIN(sin);
+static PT_THREAD(read_bytes(struct owfsd_state *s, uint8_t len)) {
+	PSOCK_BEGIN(&s->sock);
 
+	// Check buffer length
 	if (len > OW_BUFLEN) {
-		printf_P(PSTR("owfsd: read length overrun\n"));
-		PSOCK_CLOSE_EXIT(sin);
+		s->status = ERR_BUFSZ;
+		PSOCK_EXIT(&s->sock);
 	}
 
 	// Read exactly len bytes
-	sin->bufsize = len;
-	PSOCK_READBUF(sin);
+	s->sock.bufsize = len;
+	PSOCK_READBUF(&s->sock);
 
 	// Check length
-	if (PSOCK_DATALEN(sin) != len) {
-		printf_P(PSTR("owfsd: read len fail\n"));
-		PSOCK_CLOSE_EXIT(sin);
+	if (PSOCK_DATALEN(&s->sock) != len) {
+		s->status = ERR_BUFSZ;
+		PSOCK_EXIT(&s->sock);
 	}
 
-	PSOCK_END(sin);
+	// Read successful
+	s->status = ERR_OK;
+
+	PSOCK_END(&s->sock);
 }
 
 static PT_THREAD(send_response(struct owfsd_state *s)) {
@@ -79,174 +115,194 @@ static PT_THREAD(send_response(struct owfsd_state *s)) {
 
 	// Send the response
 	s->sock.bufsize = OW_BUFLEN;
-	PSOCK_SEND(&s->sock, s->buf_out, s->len + 1);
+	PSOCK_SEND(&s->sock, (uint8_t *)&s->pkt, s->pkt.len + 2);
 
 	PSOCK_END(&s->sock);
 }
 
-static PT_THREAD(conn_abort(struct psock *sin)) {
-	PSOCK_BEGIN(sin);
-	PSOCK_CLOSE_EXIT(sin);
-	PSOCK_END(sin);
+static PT_THREAD(send_error(struct owfsd_state *s)) {
+	PSOCK_BEGIN(&s->sock);
+
+	// Clobber response size & length
+	s->pkt.len = sizeof(s->status);
+	s->pkt.cmd = CMD_RET_ERROR;
+
+	// Copy over error code
+	s->pkt.buf.error = s->status;
+
+	// Send the error response
+	s->sock.bufsize = OW_BUFLEN;
+	PSOCK_SEND(&s->sock, (uint8_t *)&s->pkt, s->pkt.len + 2);
+
+	PSOCK_END(&s->sock);
 }
 
 static int cmd_reset(struct owfsd_state *s) {
 	// Reset the bus
 	int ret = ow_reset();
 	if (ret == -2) {
-		printf_P(PSTR("owfsd: bus short detected\n"));
+		// Log something
+		syslog_P(LOG_DAEMON | LOG_ERR,
+			PSTR("1-Wire bus short circuit detected"));
+
+		return ERR_OWSD;
 	}
 	else if (ret < 0) {
-		printf_P(PSTR("owfsd: bus reset failed\n"));
-		return -1;
+		// Log something
+		syslog_P(LOG_DAEMON | LOG_ERR,
+			PSTR("1-Wire bus reset failure"));
+
+		return ERR_OWERR;
 	}
 
-	return 0;
+	return ERR_OK;
 }
 
 static int cmd_byte(struct owfsd_state *s) {
 	// Read/write bytes
-	int ret = ow_block(&s->buf_out[2], s->len - 1);
-	if (ret) {
-		printf_P(PSTR("owfsd: touch byte failed\n"));
-		return -1;
+	int ret = ow_block(s->pkt.buf.bytes, s->pkt.len);
+	if (ret < 0) {
+		return ERR_OWERR;
 	}
 
-	return 0;
+	return ERR_OK;
 }
 
 static int cmd_bit(struct owfsd_state *s) {
 	// Loop through the data buffer touching bits
-	for (int i = 0; i < s->len - 1; i++) {
-		int ret = ow_touch_bit(s->buf_out[i + 2]);
+	for (int i = 0; i < s->pkt.len; i++) {
+		int ret = ow_touch_bit(s->pkt.buf.bytes[i]);
 		if (ret < 0) {
-			printf_P(PSTR("owfsd: touch bit failed\n"));
-			return ret;
+			return ERR_OWERR;
 		}
 
-		s->buf_out[i + 2] = ret ? 0xff : 0x00;
+		s->pkt.buf.bytes[i] = ret ? 0xff : 0x00;
 	}
 
-	return 0;
+	return ERR_OK;
 }
 
 static int cmd_search(struct owfsd_state *s) {
 	ow_search_t src;
 
 	// Set up the fields
-	memcpy(src.rom_no, &s->buf_out[2], sizeof(src.rom_no));
-	src.last_discrepancy = s->buf_out[10] & 0xff;
+	memcpy(src.rom_no, s->pkt.buf.search.addr, sizeof(src.rom_no));
+	src.last_discrepancy = s->pkt.buf.search.flags;
 	src.last_family_discrepancy = 0;
 	src.last_device_flag = 0;
 	// FIXME: alarm search
 
 	int ret = ow_search_next(&src);
 	if (ret < 0) {
-		printf_P(PSTR("owfsd: search failed\n"));
+		// Log something
+		syslog_P(LOG_DAEMON | LOG_ERR,
+			PSTR("1-Wire bus search failed"));
+
+		return ERR_OWERR;
 	}
 	else if (ret == 0) {
-		memset(&s->buf_out[2], 0, sizeof(ow_addr_t));
-		s->buf_out[10] = 0xff; // no devices on bus
+		memset(s->pkt.buf.search.addr, 0, sizeof(ow_addr_t));
+		s->pkt.buf.search.flags = 0xff; // no devices on bus
+
+		return ERR_OK;
+	}
+
+	// Copy back the found 1-Wire address
+	memcpy(&s->pkt.buf.search.addr, src.rom_no, sizeof(src.rom_no));
+
+	// Found last device?
+	if (src.last_device_flag) {
+		s->pkt.buf.search.flags = 0xfe;
 	}
 	else {
-		memcpy(&s->buf_out[2], src.rom_no, sizeof(src.rom_no));
-		if (src.last_device_flag) {
-			s->buf_out[10] = 0xfe;
-		}
-		else {
-			s->buf_out[10] = src.last_discrepancy;
-		}
+		s->pkt.buf.search.flags = src.last_discrepancy;
 	}
 
-	return 0;
+	return ERR_OK;
 }
 
-static int cmd_byte_pu(struct owfsd_state *s) {
-
-	uint8_t delay = s->buf_out[2];
-	uint8_t byte = s->buf_out[3];
-
-	int ret = ow_write_byte_power(byte);
+static int cmd_byte_spu(struct owfsd_state *s) {
+	// Send power byte command
+	int ret = ow_write_byte_power(s->pkt.buf.spu.byte);
 	if (ret) {
-		return -1;
+		return ERR_OWERR;
 	}
 
-	while (delay--) {
+	// Wait for delay * 10ms
+	while (s->pkt.buf.spu.delay--) {
 		// FIXME: find a better way of doing this!
-		_delay_ms(500);
+		_delay_ms(10);
 	}
 
 	ret = ow_level_std();
 	if (ret) {
-		return -1;
+		return ERR_OWERR;
 	}
 
-	return 0;
+	return ERR_OK;
 }
 
 static PT_THREAD(handle_connection(struct owfsd_state *s)) {
-	int ret;
 	PT_BEGIN(&s->pt);
 
 	while (1) {
 		// Read length byte and command
-		PT_WAIT_THREAD(&s->pt, read_bytes(&s->sock, 2));
+		PT_WAIT_THREAD(&s->pt, read_bytes(s, 2));
+		if (s->status) {
+			PT_WAIT_THREAD(&s->pt, send_error(s));
+			continue;
+		}
 
-		// Read in the length and command byte
-		s->len = s->buf_in[0];
-		s->cmd = s->buf_in[1];
+		// Read in the length and command bytes
+		s->pkt.len = s->buf_in[0];
+		s->pkt.cmd = s->buf_in[1];
 
 		// Make sure the length isn't too long
-		if (s->len >= OW_BUFLEN) {
-			printf_P(PSTR("owfsd: too long!\n"));
-			PT_WAIT_THREAD(&s->pt, conn_abort(&s->sock));
-			PT_EXIT(&s->pt);
+		if (s->pkt.len > OW_BUFLEN) {
+			s->status = ERR_BUFSZ;
+			PT_WAIT_THREAD(&s->pt, send_error(s));
+			continue;
 		}
-		else if (s->len == 0) {
-			printf_P(PSTR("owfsd: too short!\n"));
-			PT_WAIT_THREAD(&s->pt, conn_abort(&s->sock));
-			PT_EXIT(&s->pt);
-		}
+		else if (s->pkt.len) {
+			// Read in the data packet
+			PT_WAIT_THREAD(&s->pt, read_bytes(s, s->pkt.len));
+			if (s->status) {
+				PT_WAIT_THREAD(&s->pt, send_error(s));
+				continue;
+			}
 
-		// Read in the data packet
-		if (s->len - 1) {
-			PT_WAIT_THREAD(&s->pt, read_bytes(&s->sock, s->len - 1));
+			// Copy the packet contents
+			memcpy(s->pkt.buf.bytes, s->buf_in, s->pkt.len);
 		}
-
-		// Set up the output buffer
-		s->buf_out[0] = s->len;
-		s->buf_out[1] = s->cmd;
-		memcpy(&s->buf_out[2], s->buf_in, s->len - 1);
 
 		// Act on command
-		if (s->cmd == 'R' && s->len == 1) {
-			ret = cmd_reset(s);
+		if (s->pkt.cmd == CMD_RESET && s->pkt.len == 0) {
+			s->status = cmd_reset(s);
 		}
-		else if (s->cmd == 'B' && s->len > 1) {
-			ret = cmd_byte(s);
+		else if (s->pkt.cmd == CMD_BYTES && s->pkt.len > 0) {
+			s->status = cmd_byte(s);
 		}
-		else if (s->cmd == 'b' && s->len > 1) {
-			ret = cmd_bit(s);
+		else if (s->pkt.cmd == CMD_BITS && s->pkt.len > 0) {
+			s->status = cmd_bit(s);
 		}
-		else if (s->cmd == 'A' && s->len == 10) {
-			ret = cmd_search(s);
+		else if (s->pkt.cmd == CMD_SEARCH && s->pkt.len == 9) {
+			s->status = cmd_search(s);
 		}
-		else if (s->cmd == 'P' && s->len == 3) {
-			ret = cmd_byte_pu(s);
+		else if (s->pkt.cmd == CMD_BYTE_SPU && s->pkt.len == 2) {
+			s->status = cmd_byte_spu(s);
 		}
 		else {
-			PT_WAIT_THREAD(&s->pt, conn_abort(&s->sock));
-			PT_EXIT(&s->pt);
+			s->status = ERR_INVALID;
 		}
 
 		// Check command result
-		if (ret) {
-			uip_abort();
-			PT_EXIT(&s->pt);
+		if (s->status) {
+			PT_WAIT_THREAD(&s->pt, send_error(s));
 		}
-
-		// Send response
-		PT_WAIT_THREAD(&s->pt, send_response(s));
+		else {
+			// Send response
+			PT_WAIT_THREAD(&s->pt, send_response(s));
+		}
 	}
 
 	PT_END(&s->pt);
@@ -259,14 +315,11 @@ static void owfsd_appcall(void *state) {
 		if (s != NULL) {
 			// Free state data
 			free(s);
-			conns_free++;
 			tcp_markconn(uip_conn, NULL);
+			conns_free++;
 		}
 	}
 	else if (uip_connected()) {
-		syslog_P(LOG_DAEMON | LOG_INFO, PSTR("Connection from %d.%d.%d.%d"),
-			uip_ipaddr_to_quad(&uip_conn->ripaddr));
-
 		// Allocate a connection if we can
 		if (conns_free) {
 			s = calloc(1, sizeof(*s));
@@ -278,8 +331,14 @@ static void owfsd_appcall(void *state) {
 
 		// Make sure we got some memory
 		if (s == NULL) {
+			// Reset the connection so the remote end knows something is up
 			uip_abort();
-			syslog_P(LOG_DAEMON | LOG_ERR, PSTR("Could not allocate memory"));
+
+			// Log something
+			syslog_P(LOG_DAEMON | LOG_WARNING,
+				PSTR("%d.%d.%d.%d: too much going on, try later"),
+				uip_ipaddr_to_quad(&uip_conn->ripaddr));
+
 			return;
 		}
 
@@ -289,32 +348,39 @@ static void owfsd_appcall(void *state) {
 		PSOCK_INIT(&s->sock, s->buf_in, OW_BUFLEN);
 		PT_INIT(&s->pt);
 
+		// Log something
+		syslog_P(LOG_DAEMON | LOG_INFO,
+			PSTR("%d.%d.%d.%d: Connected"),
+			uip_ipaddr_to_quad(&uip_conn->ripaddr));
+
 		// Handle the connection
 		handle_connection(s);
 	}
 	else if (s != NULL) {
 		if (uip_poll()) {
 			if (stimer_expired(&s->timer)) {
-				uip_abort();
+				// Log something
+				syslog_P(LOG_DAEMON | LOG_ERR,
+					PSTR("%d.%d.%d.%d: Timeout due to inactivity"),
+					uip_ipaddr_to_quad(&uip_conn->ripaddr));
+
+				// Close the connection gracefully
+				uip_close();
 
 				// Free state data
 				free(s);
-				s = NULL;
 				tcp_markconn(uip_conn, NULL);
 				conns_free++;
 
-				syslog_P(LOG_DAEMON | LOG_ERR,
-					PSTR("%d.%d.%d.%d: connection timed out"),
-					uip_ipaddr_to_quad(&uip_conn->ripaddr));
+				return;
 			}
 		}
 		else {
+			// Connection still in use
 			stimer_restart(&s->timer);
 		}
 
-		if (s) {
-			handle_connection(s);
-		}
+		handle_connection(s);
 	}
 	else {
 		uip_abort();
@@ -326,7 +392,10 @@ PROCESS_THREAD(owfsd_process, ev, data) {
 
 	int err = ds2482_detect(0x30);
 	if (err) {
-		printf_P(PSTR("owfsd: DS2482 detect failed.\n"));
+		// Log something
+		syslog_P(LOG_DAEMON | LOG_ERR,
+			PSTR("DS2482 initialisation failed. Exiting."));
+
 		PROCESS_EXIT();
 	}
 

@@ -25,8 +25,6 @@
 #include "drivers/port_ext.h"
 #include "shell.h"
 
-#define DS18B20_CONV_TIMEOUT (2 * CLOCK_SECOND)
-
 PROCESS(shell_rlytest_process, "rlytest");
 SHELL_COMMAND(rlytest_command,
 	"rlytest", "rlytest <1234>: test external relay board(s)",

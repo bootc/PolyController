@@ -1,8 +1,21 @@
 
-* HC595 test
+* owfs code
+ * Handle errors
+ * Length should not include command byte (only data)
+ * Delays are multiples of 10ms not 500ms
+
+* owfsd
+ * DS2409 fixups (?)
+ * Alarm search
+ * Bus locking
+ * Inquiry/Capabilities command (model, version, max buffer size)
 
 * Command-line CFS/PolyFS peeking
-* Command-line 1-wire peeking
+ * Rewrite cat
+ * CRC/verify code command
+* Command-line 1-wire peeking. Commands for:
+ * Search, alarm search, presence
+ * Temperature readings
 * Command-line sensor interface
 * Command-line owfs interface
 
@@ -13,16 +26,25 @@
  * Individual sensors (1-wire or owfs)
  * Sensor groups (with consolidation functions like AVG,MIN,MAX)
 
-* NTP server from DHCP/config
-* Syslog server from DHCP/config
+* 1-Wire sensors library
+ * Alarm search
+ * DS18B20
+ * The ones in LINK sensors
+ * Hobby Boards I/O board
+
+* IP configuration from config
+ * Static IP
+ * Fixed DNS or from DHCP
+
+* NTP config (dhcp/ip/hostname/off, update interval)
+* Syslog config (ip/hostname/off, priority mask)
 
 * OWFS client (to pull values from owfs)
 * PID controller
 * Scheduling/calendar tool
 * Web interface
 * IPv6 version
-
-* 1-wire bridge / interface
+* More sensible error codes everywhere (errno.h style?)
 
 Maybes?
 ? xAP node thingy
