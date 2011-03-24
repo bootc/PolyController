@@ -21,6 +21,7 @@
 #include <string.h>
 #include <util/crc16.h>
 #include <util/delay.h>
+#include <init.h>
 
 #include "ds2482.h"
 #include "i2c.h"
@@ -525,18 +526,18 @@ int ow_touch_byte(uint8_t sendbyte) {
 	return sendbyte;
 }
 
-int ow_presence(ow_addr_t addr) {
+int ow_presence(const ow_addr_t *addr) {
 	int res;
 	ow_search_t se;
 
 	se.last_discrepancy = 64;
 	se.last_device_flag = 0;
-	memcpy(se.rom_no, addr, sizeof(addr));
+	memcpy(&se.rom_no, addr, sizeof(se.rom_no));
 
 	res = ow_search(&se);
 	if (res == 1) {
 		// check if same device found
-		if (memcmp(se.rom_no, addr, sizeof(addr)) != 0) {
+		if (memcmp(&se.rom_no, addr, sizeof(se.rom_no)) != 0) {
 			res = 0;
 		}
 	}
@@ -560,13 +561,13 @@ int ow_search_next(ow_search_t *se) {
 }
 
 int ow_search_target(ow_search_t *se, uint8_t family) {
-	memset(se->rom_no, 0, sizeof(se->rom_no));
+	memset(&se->rom_no, 0, sizeof(se->rom_no));
 	se->last_discrepancy = 64;
 	se->last_family_discrepancy = 0;
 	se->last_device_flag = 0;
 
 	// set the search state to find SearchFamily type devices
-	se->rom_no[0] = family;
+	se->rom_no.family = family;
 
 	return ow_search(se);
 }
@@ -627,7 +628,7 @@ static int ow_search(ow_search_t *se) {
 			// if this discrepancy if before the Last Discrepancy
 			// on a previous next then pick the same as last time
 			if (id_bit_number < se->last_discrepancy) {
-				if ((se->rom_no[rom_byte_number] & rom_byte_mask) > 0)
+				if ((se->rom_no.u[rom_byte_number] & rom_byte_mask) > 0)
 					search_direction = 1;
 				else
 					search_direction = 0;
@@ -669,10 +670,10 @@ static int ow_search(ow_search_t *se) {
 				// set or clear the bit in the ROM byte rom_byte_number
 				// with mask rom_byte_mask
 				if (search_direction == 1) {
-					se->rom_no[rom_byte_number] |= rom_byte_mask;
+					se->rom_no.u[rom_byte_number] |= rom_byte_mask;
 				}
 				else {
-					se->rom_no[rom_byte_number] &= (uint8_t)~rom_byte_mask;
+					se->rom_no.u[rom_byte_number] &= (uint8_t)~rom_byte_mask;
 				}
 
 				// increment the byte counter id_bit_number
@@ -685,7 +686,7 @@ static int ow_search(ow_search_t *se) {
 				if (rom_byte_mask == 0) {
 					// accumulate the CRC
 					se->crc = _crc_ibutton_update(se->crc,
-						se->rom_no[rom_byte_number]);
+						se->rom_no.u[rom_byte_number]);
 					rom_byte_number++;
 					rom_byte_mask = 1;
 				}
@@ -710,7 +711,7 @@ static int ow_search(ow_search_t *se) {
 
 	// if no device found then reset counters so next
 	// 'search' will be like a first
-	if (!search_result || (se->rom_no[0] == 0)) {
+	if (!search_result || (se->rom_no.family == 0)) {
 		se->last_discrepancy = 0;
 		se->last_device_flag = 0;
 		se->last_family_discrepancy = 0;
@@ -724,7 +725,7 @@ int ow_speed(int speed) {
 	int ret;
 
 	// set the speed
-	if (speed == MODE_OVERDRIVE) {
+	if (speed == DS2482_MODE_OVERDRIVE) {
 		s.cfg_1ws = 1;
 	}
 	else {
@@ -800,4 +801,10 @@ int ow_write_byte_power(uint8_t sendbyte) {
 
 	return ret;
 }
+
+static void ds2482_init(void) {
+	ds2482_detect(DS2482_ADDR_00);
+}
+
+INIT_DRIVER(ds2482, ds2482_init);
 

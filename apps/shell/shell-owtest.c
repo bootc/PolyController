@@ -36,10 +36,10 @@ SHELL_COMMAND(owtest_command,
 INIT_SHELL_COMMAND(owtest_command);
 
 static struct pt ow_pt;
-static ow_addr_t sensor;
+static ow_search_t search;
 static struct timer timeout;
 
-static PT_THREAD(read_temp(struct pt *pt)) {
+static PT_THREAD(read_temp(struct pt *pt, const ow_addr_t *addr)) {
 	int err;
 	uint8_t scratch[9];
 	uint8_t crc = 0;
@@ -59,8 +59,8 @@ static PT_THREAD(read_temp(struct pt *pt)) {
 		printf_P(PSTR("Match ROM failed\n"));
 		PT_EXIT(pt);
 	}
-	for (int i = 0; i < sizeof(ow_addr_t); i++) {
-		err = ow_write_byte(sensor[i]);
+	for (int i = 0; i < sizeof(*addr); i++) {
+		err = ow_write_byte(addr->u[i]);
 		if (err) {
 			printf_P(PSTR("Match ROM failed\n"));
 			PT_EXIT(pt);
@@ -113,8 +113,8 @@ static PT_THREAD(read_temp(struct pt *pt)) {
 		printf_P(PSTR("Match ROM failed\n"));
 		PT_EXIT(pt);
 	}
-	for (int i = 0; i < sizeof(ow_addr_t); i++) {
-		err = ow_write_byte(sensor[i]);
+	for (int i = 0; i < sizeof(*addr); i++) {
+		err = ow_write_byte(addr->u[i]);
 		if (err) {
 			printf_P(PSTR("Match ROM failed\n"));
 			PT_EXIT(pt);
@@ -164,7 +164,6 @@ static PT_THREAD(read_temp(struct pt *pt)) {
 
 PROCESS_THREAD(shell_owtest_process, ev, data) {
 	int err;
-	ow_search_t s;
 
 	PROCESS_BEGIN();
 
@@ -184,7 +183,7 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 		PROCESS_EXIT();
 	}
 
-	err = ow_search_first(&s);
+	err = ow_search_first(&search);
 	do {
 		if (err < 0) {
 			printf_P(PSTR("Search error: %d\n"), err);
@@ -196,19 +195,21 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 		}
 
 		printf_P(PSTR("Found: %02x.%02x%02x%02x%02x%02x%02x\n"),
-			s.rom_no[0], // family code
-			s.rom_no[1], s.rom_no[2], s.rom_no[3],
-			s.rom_no[4], s.rom_no[5], s.rom_no[6]); // address
+			search.rom_no.family, // family code
+			search.rom_no.id[0], search.rom_no.id[1], search.rom_no.id[2],
+			search.rom_no.id[3], search.rom_no.id[4], search.rom_no.id[5]);
 
-		if (s.rom_no[0] == 0x28) {
-			memcpy(sensor, s.rom_no, sizeof(sensor));
-
+		if (search.rom_no.family == 0x28) {
 			printf_P(PSTR("Reading temperature...\n"));
-			PROCESS_PT_SPAWN(&ow_pt, read_temp(&ow_pt));
+			PROCESS_PT_SPAWN(&ow_pt, read_temp(&ow_pt, &search.rom_no));
 		}
 
-		err = ow_search_next(&s);
-	} while (err != 0);
+		if (search.last_device_flag) {
+			break;
+		}
+
+		err = ow_search_next(&search);
+	} while (1);
 
 	printf_P(PSTR("Search complete.\n"));
 

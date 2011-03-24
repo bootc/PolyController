@@ -25,11 +25,25 @@
  * Driver for DS2482 1-wire master.
  */
 
-#define MODE_STANDARD  0x00
-#define MODE_OVERDRIVE 0x01
-#define MODE_STRONG    0x02
+#define DS2482_ADDR_00	0x30
+#define DS2482_ADDR_01	0x32
+#define DS2482_ADDR_10	0x34
+#define DS2482_ADDR_11	0x36
 
-typedef uint8_t ow_addr_t[8];
+#define DS2482_MODE_STANDARD	0x00
+#define DS2482_MODE_OVERDRIVE	0x01
+#define DS2482_MODE_STRONG		0x02
+
+typedef struct {
+	union {
+		uint8_t u[8];
+		struct {
+			uint8_t family;
+			uint8_t id[6];
+			uint8_t crc8;
+		};
+	};
+} ow_addr_t;
 
 typedef struct {
 	ow_addr_t	rom_no;
@@ -159,7 +173,7 @@ int ow_touch_byte(uint8_t byte);
  *  -1 - failure
  *  -2 - short detected
  */
-int ow_presence(ow_addr_t s);
+int ow_presence(const ow_addr_t *s);
 
 /*
  * Find the 'first' device on the 1-Wire network.

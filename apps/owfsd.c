@@ -184,7 +184,7 @@ static int cmd_search(struct owfsd_state *s) {
 	ow_search_t src;
 
 	// Set up the fields
-	memcpy(src.rom_no, s->pkt.buf.search.addr, sizeof(src.rom_no));
+	memcpy(&src.rom_no, &s->pkt.buf.search.addr, sizeof(src.rom_no));
 	src.last_discrepancy = s->pkt.buf.search.flags;
 	src.last_family_discrepancy = 0;
 	src.last_device_flag = 0;
@@ -199,14 +199,14 @@ static int cmd_search(struct owfsd_state *s) {
 		return ERR_OWERR;
 	}
 	else if (ret == 0) {
-		memset(s->pkt.buf.search.addr, 0, sizeof(ow_addr_t));
+		memset(&s->pkt.buf.search.addr, 0, sizeof(ow_addr_t));
 		s->pkt.buf.search.flags = 0xff; // no devices on bus
 
 		return ERR_OK;
 	}
 
 	// Copy back the found 1-Wire address
-	memcpy(&s->pkt.buf.search.addr, src.rom_no, sizeof(src.rom_no));
+	memcpy(&s->pkt.buf.search.addr, &src.rom_no, sizeof(src.rom_no));
 
 	// Found last device?
 	if (src.last_device_flag) {
@@ -363,15 +363,6 @@ static void owfsd_appcall(void *state) {
 
 PROCESS_THREAD(owfsd_process, ev, data) {
 	PROCESS_BEGIN();
-
-	int err = ds2482_detect(0x30);
-	if (err) {
-		// Log something
-		syslog_P(LOG_DAEMON | LOG_ERR,
-			PSTR("DS2482 initialisation failed. Exiting."));
-
-		PROCESS_EXIT();
-	}
 
 	tcp_listen(UIP_HTONS(OWFSD_PORT));
 
