@@ -64,10 +64,10 @@ struct owfs_packet {
 			uint8_t flags;
 		} search;
 		struct {
+			uint8_t delay;
 			uint8_t byte;
-			uint16_t delay;
 		} spu;
-		uint16_t error;
+		uint8_t error;
 	} buf;
 };
 
@@ -124,7 +124,7 @@ static PT_THREAD(send_error(struct owfsd_state *s)) {
 	PSOCK_BEGIN(&s->sock);
 
 	// Clobber response size & length
-	s->pkt.len = sizeof(s->status);
+	s->pkt.len = sizeof(s->pkt.buf.error);
 	s->pkt.cmd = CMD_RET_ERROR;
 
 	// Copy over error code
