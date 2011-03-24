@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <contiki-net.h>
-#include <sys/stimer.h>
 #include <init.h>
 #include <util/delay.h>
 #include "syslog.h"
@@ -72,7 +71,6 @@ struct owfs_packet {
 };
 
 struct owfsd_state {
-	struct stimer timer;
 	struct psock sock;
 	struct pt pt;
 	uint8_t buf_in[OW_BUFLEN];
@@ -344,7 +342,6 @@ static void owfsd_appcall(void *state) {
 
 		// Set up the connection
 		tcp_markconn(uip_conn, s);
-		stimer_set(&s->timer, 60 * 2);
 		PSOCK_INIT(&s->sock, s->buf_in, OW_BUFLEN);
 		PT_INIT(&s->pt);
 
@@ -357,29 +354,6 @@ static void owfsd_appcall(void *state) {
 		handle_connection(s);
 	}
 	else if (s != NULL) {
-		if (uip_poll()) {
-			if (stimer_expired(&s->timer)) {
-				// Log something
-				syslog_P(LOG_DAEMON | LOG_ERR,
-					PSTR("%d.%d.%d.%d: Timeout due to inactivity"),
-					uip_ipaddr_to_quad(&uip_conn->ripaddr));
-
-				// Close the connection gracefully
-				uip_close();
-
-				// Free state data
-				free(s);
-				tcp_markconn(uip_conn, NULL);
-				conns_free++;
-
-				return;
-			}
-		}
-		else {
-			// Connection still in use
-			stimer_restart(&s->timer);
-		}
-
 		handle_connection(s);
 	}
 	else {
