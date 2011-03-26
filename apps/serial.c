@@ -45,7 +45,7 @@ static int serial_putc(char c, FILE *stream) {
 static FILE uart_stream =
     FDEV_SETUP_STREAM(serial_putc, NULL, _FDEV_SETUP_WRITE);
 
-static void serial_init(void) {
+void serial_init(void) {
 #define BAUD CONFIG_UART0_BAUD
 #include <util/setbaud.h>
 	uart_init(

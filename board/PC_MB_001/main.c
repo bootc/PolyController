@@ -29,6 +29,7 @@
 
 #include <init.h>
 #include <board.h>
+#include <apps/serial.h>
 
 int main(void) {
 	// Basic board init
@@ -36,6 +37,9 @@ int main(void) {
 
 	// Start the main clock
 	clock_init();
+
+	// Set up printf as early as possible (boot messages)
+	serial_init();
 
 	// Enable interrupts
 	sei();

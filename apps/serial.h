@@ -21,4 +21,6 @@
 #ifndef APPS_SERIAL_H
 #define APPS_SERIAL_H
 
+void serial_init(void);
+
 #endif
