@@ -24,6 +24,8 @@
 #include <util/crc16.h>
 #include <util/delay.h>
 
+#include <onewire.h>
+
 #include "drivers/ds2482.h"
 #include "shell.h"
 
@@ -167,6 +169,12 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 
 	PROCESS_BEGIN();
 
+	// Attempt to acquire 1-Wire lock
+	while (!ow_lock()) {
+		PROCESS_PAUSE();
+	}
+
+	// Reset the bus
 	err = ow_reset();
 	if (err < 0) {
 		shell_output_P(&owtest_command, PSTR("Bus reset failed.\n"));
@@ -177,6 +185,7 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 		PROCESS_EXIT();
 	}
 
+	// Start the search
 	err = ow_search_first(&search, 0);
 	do {
 		if (err < 0) {
@@ -188,22 +197,30 @@ PROCESS_THREAD(shell_owtest_process, ev, data) {
 			break;
 		}
 
-		shell_output_P(&owtest_command, PSTR("Found: %02x.%02x%02x%02x%02x%02x%02x\n"),
+		// Print search result
+		shell_output_P(&owtest_command,
+			PSTR("Found: %02x.%02x%02x%02x%02x%02x%02x\n"),
 			search.rom_no.family, // family code
 			search.rom_no.id[0], search.rom_no.id[1], search.rom_no.id[2],
 			search.rom_no.id[3], search.rom_no.id[4], search.rom_no.id[5]);
 
+		// If it's a DS18B20, read it
 		if (search.rom_no.family == 0x28) {
 			shell_output_P(&owtest_command, PSTR("Reading temperature...\n"));
 			PROCESS_PT_SPAWN(&ow_pt, read_temp(&ow_pt, &search.rom_no));
 		}
 
+		// If we found the last device on the bus, break out of the loop
 		if (search.last_device_flag) {
 			break;
 		}
 
+		// Find the next device on the bus
 		err = ow_search_next(&search);
 	} while (1);
+
+	// Relinquish bus lock
+	ow_unlock();
 
 	shell_output_P(&owtest_command, PSTR("Search complete.\n"));
 

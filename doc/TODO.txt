@@ -1,10 +1,11 @@
 
 * owfs code
  * Handle errors better (?)
+ * Explicit bus locking
 
 * owfsd
  * DS2409 fixups (?)
- * Bus locking
+ * Explicit bus locking
  * Inquiry/Capabilities command (model, version, max buffer size)
 
 * Command-line CFS/PolyFS peeking
@@ -13,11 +14,10 @@
  * Search, alarm search, presence
  * Temperature readings
 * Command-line sensor interface
-* Command-line owfs interface
 
 * Configuration framework
- * Config backup/restore
  * JSON conversion
+ * Config backup/restore
 * Sensor framework
  * Individual sensors (1-wire or owfs)
  * Sensor groups (with consolidation functions like AVG,MIN,MAX)
@@ -44,3 +44,4 @@
 
 Maybes?
 ? xAP node thingy
+

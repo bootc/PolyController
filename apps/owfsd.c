@@ -23,6 +23,7 @@
 #include <contiki-net.h>
 #include <init.h>
 #include <util/delay.h>
+#include <onewire.h>
 #include "syslog.h"
 #include "drivers/ds2482.h"
 
@@ -40,6 +41,7 @@
 #define ERR_BUFSZ 2 // buffer too long, short read, etc...
 #define ERR_OWSD 3 // bus short detected
 #define ERR_OWERR 4 // general bus fault
+#define ERR_NOLOCK 5 // bus access without a lock
 
 #ifndef CONFIG_APPS_OWFSD_MAX_CONNS
 #define MAX_CONNS (UIP_CONNS / 2)
@@ -52,6 +54,19 @@
 #else /* CONFIG_APPS_OWFSD_BUFFER_SIZE */
 #define OW_BUFLEN CONFIG_APPS_OWFSD_BUFFER_SIZE
 #endif /* CONFIG_APPS_OWFSD_BUFFER_SIZE */
+
+#define LOCK_TIMER_INTERVAL (3 * CLOCK_SECOND)
+
+struct owfsd_state;
+
+struct owfs_command {
+	uint8_t cmd;
+	int (* fn)(struct owfsd_state *s);
+	struct {
+		uint8_t bus_op : 1; // Bus operation; requires lock
+		uint8_t lock_auto : 1; // Causes bus reset; auto-acquires lock
+	} flags;
+};
 
 struct owfs_packet {
 	uint8_t len;
@@ -74,8 +89,28 @@ struct owfsd_state {
 	struct psock sock;
 	struct pt pt;
 	uint8_t buf_in[OW_BUFLEN];
-	uint16_t status; // must remain a 16-bit unsigned int
+	uint8_t status;
 	struct owfs_packet pkt;
+	struct owfs_command cmd;
+	struct timer lock_timer;
+	struct {
+		uint8_t locked : 1;
+	} flags;
+};
+
+static int cmd_reset(struct owfsd_state *s);
+static int cmd_byte(struct owfsd_state *s);
+static int cmd_bit(struct owfsd_state *s);
+static int cmd_search(struct owfsd_state *s);
+static int cmd_byte_spu(struct owfsd_state *s);
+
+static struct owfs_command commands[] PROGMEM = {
+	{ CMD_RESET,	cmd_reset,		{ .bus_op = 1, .lock_auto = 1, } },
+	{ CMD_BYTES,	cmd_byte,		{ .bus_op = 1, } },
+	{ CMD_BITS,		cmd_bit,		{ .bus_op = 1, } },
+	{ CMD_SEARCH,	cmd_search,		{ .bus_op = 1, .lock_auto = 1, } },
+	{ CMD_BYTE_SPU,	cmd_byte_spu,	{ .bus_op = 1, } },
+	{} // end-of-table marker
 };
 
 static uint8_t conns_free = MAX_CONNS;
@@ -136,6 +171,10 @@ static PT_THREAD(send_error(struct owfsd_state *s)) {
 }
 
 static int cmd_reset(struct owfsd_state *s) {
+	if (s->pkt.len != 0) {
+		return ERR_INVALID;
+	}
+
 	// Reset the bus
 	int ret = ow_reset();
 	if (ret == -2) {
@@ -157,6 +196,10 @@ static int cmd_reset(struct owfsd_state *s) {
 }
 
 static int cmd_byte(struct owfsd_state *s) {
+	if (s->pkt.len == 0) {
+		return ERR_INVALID;
+	}
+
 	// Read/write bytes
 	int ret = ow_block(s->pkt.buf.bytes, s->pkt.len);
 	if (ret < 0) {
@@ -167,6 +210,10 @@ static int cmd_byte(struct owfsd_state *s) {
 }
 
 static int cmd_bit(struct owfsd_state *s) {
+	if (s->pkt.len == 0) {
+		return ERR_INVALID;
+	}
+
 	// Loop through the data buffer touching bits
 	for (int i = 0; i < s->pkt.len; i++) {
 		int ret = ow_touch_bit(s->pkt.buf.bytes[i]);
@@ -181,6 +228,10 @@ static int cmd_bit(struct owfsd_state *s) {
 }
 
 static int cmd_search(struct owfsd_state *s) {
+	if (s->pkt.len != sizeof(s->pkt.buf.search)) {
+		return ERR_INVALID;
+	}
+
 	ow_search_t src;
 
 	// Set up the fields
@@ -220,6 +271,10 @@ static int cmd_search(struct owfsd_state *s) {
 }
 
 static int cmd_byte_spu(struct owfsd_state *s) {
+	if (s->pkt.len != sizeof(s->pkt.buf.spu)) {
+		return ERR_INVALID;
+	}
+
 	// Send power byte command
 	int ret = ow_write_byte_power(s->pkt.buf.spu.byte);
 	if (ret) {
@@ -257,6 +312,14 @@ static PT_THREAD(handle_connection(struct owfsd_state *s)) {
 
 		// Make sure the length isn't too long
 		if (s->pkt.len > OW_BUFLEN) {
+			// Weed to consume the sent bytes anyway
+			while (s->pkt.len) {
+				PT_WAIT_THREAD(&s->pt, read_bytes(s,
+					s->pkt.len < OW_BUFLEN ? s->pkt.len : OW_BUFLEN));
+				s->pkt.len -= s->pkt.len < OW_BUFLEN ? s->pkt.len : OW_BUFLEN;
+			}
+
+			// Send error
 			s->status = ERR_BUFSZ;
 			PT_WAIT_THREAD(&s->pt, send_error(s));
 			continue;
@@ -273,25 +336,55 @@ static PT_THREAD(handle_connection(struct owfsd_state *s)) {
 			memcpy(s->pkt.buf.bytes, s->buf_in, s->pkt.len);
 		}
 
-		// Act on command
-		if (s->pkt.cmd == CMD_RESET && s->pkt.len == 0) {
-			s->status = cmd_reset(s);
-		}
-		else if (s->pkt.cmd == CMD_BYTES && s->pkt.len > 0) {
-			s->status = cmd_byte(s);
-		}
-		else if (s->pkt.cmd == CMD_BITS && s->pkt.len > 0) {
-			s->status = cmd_bit(s);
-		}
-		else if (s->pkt.cmd == CMD_SEARCH && s->pkt.len == 9) {
-			s->status = cmd_search(s);
-		}
-		else if (s->pkt.cmd == CMD_BYTE_SPU && s->pkt.len == 2) {
-			s->status = cmd_byte_spu(s);
-		}
-		else {
+		// Get the command info
+		struct owfs_command *cmd = commands;
+		do {
+			uint8_t c = pgm_read_byte(&cmd->cmd);
+			if (!c) {
+				memset(&s->cmd, 0, sizeof(s->cmd));
+				break;
+			}
+			else if (c == s->pkt.cmd) {
+				memcpy_P(&s->cmd, cmd, sizeof(s->cmd));
+				break;
+			}
+			else {
+				cmd++;
+			}
+		} while (1);
+
+		// Sanity check command
+		if (!s->cmd.cmd) {
 			s->status = ERR_INVALID;
+			PT_WAIT_THREAD(&s->pt, send_error(s));
+			continue;
 		}
+
+		// Check if a lock is required
+		if (s->cmd.flags.bus_op) {
+			if (s->flags.locked) {
+				// Refresh lock timer
+				timer_restart(&s->lock_timer);
+			}
+			else if (s->cmd.flags.lock_auto) {
+				// Acquire a lock
+				while (!ow_lock()) {
+					uip_poll_conn(uip_conn);
+					PT_YIELD(&s->pt);
+				}
+
+				s->flags.locked = 1;
+				timer_set(&s->lock_timer, LOCK_TIMER_INTERVAL);
+			}
+			else {
+				s->status = ERR_NOLOCK;
+				PT_WAIT_THREAD(&s->pt, send_error(s));
+				continue;
+			}
+		}
+
+		// Run command
+		s->status = s->cmd.fn(s);
 
 		// Check command result
 		if (s->status) {
@@ -311,6 +404,11 @@ static void owfsd_appcall(void *state) {
 
 	if (uip_closed() || uip_aborted() || uip_timedout()) {
 		if (s != NULL) {
+			// Make sure we release the lock
+			if (s->flags.locked) {
+				ow_unlock();
+			}
+
 			// Free state data
 			free(s);
 			tcp_markconn(uip_conn, NULL);
@@ -355,6 +453,12 @@ static void owfsd_appcall(void *state) {
 	}
 	else if (s != NULL) {
 		handle_connection(s);
+
+		// Check for expired locks
+		if (s->flags.locked && timer_expired(&s->lock_timer)) {
+			ow_unlock();
+			s->flags.locked = 0;
+		}
 	}
 	else {
 		uip_abort();
