@@ -115,6 +115,9 @@ static int ow_search(ow_search_t *s);
 int ds2482_detect(uint8_t addr) {
 	int err;
 
+	// init I2C to make sure it's up
+	i2c_init();
+
 	// set global address
 	s.addr = addr;
 
@@ -809,8 +812,8 @@ int ow_write_byte_power(uint8_t sendbyte) {
 	return ret;
 }
 
-static void ds2482_init(void) {
-	ds2482_detect(DS2482_ADDR_00);
+static int ds2482_init(void) {
+	return ds2482_detect(DS2482_ADDR_00);
 }
 
 INIT_DRIVER(ds2482, ds2482_init);

@@ -38,11 +38,11 @@ int main(void) {
 	// Start the main clock
 	clock_init();
 
-	// Set up printf as early as possible (boot messages)
-	serial_init();
-
 	// Enable interrupts
 	sei();
+
+	// Set up printf as early as possible (boot messages)
+	serial_init();
 
 	// Initialise everything else
 	init_doinit();
@@ -51,6 +51,11 @@ int main(void) {
 	// Set up the watchdog
 	wdt_enable(CONFIG_WATCHDOG_TIMEOUT);
 #endif
+
+	// Print boot message
+	printf_P(PSTR("\n\n"));
+	printf_P(PSTR("PolyController " CONFIG_BOARD " " CONFIG_IMAGE "\n"));
+	printf_P(PSTR("\n"));
 
 	while (1) {
 #if CONFIG_WATCHDOG
@@ -65,7 +70,12 @@ int main(void) {
 	return 0;
 }
 
-INIT_LIBRARY(process, process_init);
+static int init_contiki(void) {
+	process_init();
+	return 0;
+}
+
+INIT_LIBRARY(contiki, init_contiki);
 INIT_PROCESS(etimer_process);
 
 #if LOG_CONF_ENABLED

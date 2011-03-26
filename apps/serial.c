@@ -104,4 +104,3 @@ PROCESS_THREAD(serial_process, ev, data) {
 	PROCESS_END();
 }
 
-INIT_DRIVER(serial, serial_init);

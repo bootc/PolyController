@@ -197,5 +197,10 @@ unsigned char i2c_readNak(void)
 
 }/* i2c_readNak */
 
-INIT_DRIVER(i2c, i2c_init);
+static int i2c_autoinit(void) {
+	i2c_init();
+	return 0;
+}
+
+INIT_DRIVER(i2c, i2c_autoinit);
 

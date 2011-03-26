@@ -77,10 +77,10 @@ polyfs_fs_t *flashmgt_pfs;
 polyfs_fs_t flashmgt_pfs_struct;
 #endif
 
-static void flashmgt_init(void);
+static int flashmgt_init(void);
 INIT_LIBRARY(flashmgt, flashmgt_init);
 
-static void flashmgt_init(void) {
+static int flashmgt_init(void) {
 	int ret;
 
 #if CONFIG_LIB_POLYFS_CFS
@@ -92,36 +92,36 @@ static void flashmgt_init(void) {
 	// Make sure the flash chip is ready
 	ret = dataflash_wait_ready();
 	if (ret) {
-		return;
+		return ret;
 	}
 
 	// Let us change SREG
 	ret = dataflash_write_enable();
 	if (ret) {
-		return;
+		return ret;
 	}
 
 	// Clear SPRL so we can change lockbits
 	ret = dataflash_write_status(0x3c);
 	if (ret) {
-		return;
+		return ret;
 	}
 
 	// Let us change SREG
 	dataflash_write_enable();
 	if (ret) {
-		return;
+		return ret;
 	}
 
 	// Set SPRL and lock all sectors
 	dataflash_write_status(DATAFLASH_SREG_SPRL | 0x3c);
 	if (ret) {
-		return;
+		return ret;
 	}
 
 	// Check we have some info about the flash blocks
 	if (!settings_check(SETTINGS_KEY_FLASHMGT_STATUS, 0)) {
-		return;
+		return -1;
 	}
 
 	// Read in the info
@@ -130,7 +130,7 @@ static void flashmgt_init(void) {
 		&status, &size);
 	if (ret != SETTINGS_STATUS_OK || size != sizeof(status)) {
 		status.primary = 1; // so that secondary is 0
-		return;
+		return ret;
 	}
 
 #if CONFIG_LIB_POLYFS_CFS
@@ -139,7 +139,7 @@ static void flashmgt_init(void) {
 		part[status.primary].start,
 		part[status.primary].end - part[status.primary].start + 1);
 	if (ret < 0) {
-		return;
+		return ret;
 	}
 
 	// Set up the CFS FS pointer
@@ -147,7 +147,7 @@ static void flashmgt_init(void) {
 	polyfs_cfs_fs = flashmgt_pfs;
 #endif
 
-	return;
+	return 0;
 }
 
 int flashmgt_sec_open(polyfs_fs_t *ptr) {

@@ -208,7 +208,7 @@ static struct shell_command name = { NULL, shell_command_##name##_cmd_str, \
 
 #define INIT_SHELL_COMMAND(name) \
 	INIT_COMPONENT(name) \
-	{ shell_register_command(&name); }
+	{ shell_register_command(&name); return 0; }
 
 /**
  * \brief      Output data from a shell command

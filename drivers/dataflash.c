@@ -125,7 +125,7 @@ static inline void send_address(uint32_t addr) {
 	}
 }
 
-static void dataflash_init(void) {
+static int dataflash_init(void) {
 	// Make sure CS is pulled high (release device)
 	CONFIG_DRIVERS_DATAFLASH_DDR |= _BV(CONFIG_DRIVERS_DATAFLASH_CS);
 	CONFIG_DRIVERS_DATAFLASH_PORT |= _BV(CONFIG_DRIVERS_DATAFLASH_CS);
@@ -134,7 +134,7 @@ static void dataflash_init(void) {
 	dataflash_id_t id;
 	int ret = dataflash_read_id(&id, NULL, 0);
 	if (ret) {
-		return;
+		return -1;
 	}
 
 	// check device ID matches what we expect
@@ -143,13 +143,13 @@ static void dataflash_init(void) {
 		(id.devid1 != DEV_ID_AT26DF081A_P1) ||
 		(id.devid2 != DEV_ID_AT26DF081A_P2))
 	{
-		return;
+		return -1;
 	}
 
 	// save state
 	status.inited = 1;
 
-	return;
+	return 0;
 }
 
 int dataflash_read_id(dataflash_id_t *id, uint8_t *extinfo, uint8_t bufsz) {

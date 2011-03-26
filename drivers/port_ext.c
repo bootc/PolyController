@@ -63,7 +63,7 @@ static void shift_out(void) {
 	pulse_latch();
 }
 
-void port_ext_init(void)  {
+int port_ext_init(void)  {
 	PORT_EXT_PORT &= ~(
 		(1 << PORT_EXT_PIN_CLK) |
 		(1 << PORT_EXT_PIN_DIN) |
@@ -80,6 +80,8 @@ void port_ext_init(void)  {
 
 	// set inititial values
 	shift_out();
+
+	return 0;
 }
 
 void port_ext_update(void) {

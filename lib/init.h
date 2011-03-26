@@ -21,21 +21,34 @@
 #ifndef INIT_H
 #define INIT_H
 
-typedef void (*init_fn)(void);
+#include <avr/pgmspace.h>
+
+typedef int (*init_fn)(void);
+
+struct init_entry {
+	init_fn fn;
+	PGM_P name;
+};
 
 #define _INIT_FN(_type, _name) \
-	static void _init_##_type##_##_name##_fn(void); \
-	static const init_fn _init_##_type##_##_name \
-		__attribute__((used)) \
-		__attribute__((section("_init_" #_type))) \
-		= _init_##_type##_##_name##_fn; \
-	static void _init_##_type##_##_name##_fn(void)
+	static int _init_##_type##_##_name##_fn(void); \
+	static const char _init_##_type##_##_name##_str[] PROGMEM = #_name; \
+	static const struct init_entry _init_##_type##_##_name \
+		__attribute__((used)) __attribute__((section("_init_" #_type))) \
+	= { \
+		.fn = _init_##_type##_##_name##_fn, \
+		.name = _init_##_type##_##_name##_str, \
+	}; \
+	static int _init_##_type##_##_name##_fn(void)
 
 #define _INIT_FP(_type, _name, _initfunc) \
-	static const init_fn _init_##_type##_##_name \
-		__attribute__((used)) \
-		__attribute__((section("_init_" #_type))) \
-		= _initfunc
+	static const char _init_##_type##_##_name##_str[] PROGMEM = #_name; \
+	static const struct init_entry _init_##_type##_##_name \
+		__attribute__((used)) __attribute__((section("_init_" #_type))) \
+	= { \
+		.fn = _initfunc, \
+		.name = _init_##_type##_##_name##_str, \
+	}
 
 #define INIT_DRIVER(_name, _initfunc) \
 	_INIT_FP(drivers, _name, _initfunc)

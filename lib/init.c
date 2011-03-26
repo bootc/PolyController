@@ -25,17 +25,21 @@
 #include <avr/pgmspace.h>
 #include "init.h"
 
+#if !CONFIG_IMAGE_BOOTLOADER
+#include <stdio.h>
+#endif
+
 // Linker symbols
-extern init_fn __init_drivers_start;
-extern init_fn __init_drivers_end;
-extern init_fn __init_libraries_start;
-extern init_fn __init_libraries_end;
+extern struct init_entry *__init_drivers_start;
+extern struct init_entry *__init_drivers_end;
+extern struct init_entry *__init_libraries_start;
+extern struct init_entry *__init_libraries_end;
 #if CONFIG_LIB_CONTIKI
 extern struct process *__init_processes_start;
 extern struct process *__init_processes_end;
 #endif
-extern init_fn __init_components_start;
-extern init_fn __init_components_end;
+extern struct init_entry *__init_components_start;
+extern struct init_entry *__init_components_end;
 
 #if __AVR_LIBC_VERSION__ < 10700UL
 static inline void *memcpy_PF(void *dest, uint_farptr_t src, size_t len) {
@@ -67,9 +71,25 @@ static inline void *memcpy_PF(void *dest, uint_farptr_t src, size_t len) {
 
 static void init_call_funcs(uint_farptr_t start, uint_farptr_t end) {
 	while (start < end) {
-		init_fn fn = (init_fn)pgm_read_word_far(start);
-		fn();
-		start += sizeof(init_fn);
+		struct init_entry ent;
+		memcpy_PF(&ent, start, sizeof(ent));
+
+#if CONFIG_IMAGE_BOOTLOADER
+		ent.fn();
+#else
+		printf_P(PSTR("\rInitialising %S: "), ent.name);
+
+		int err = ent.fn();
+
+		if (err) {
+			printf_P(PSTR("FAIL (%d)\n"), err);
+		}
+		else {
+			printf_P(PSTR("OK\n"));
+		}
+#endif
+
+		start += sizeof(ent);
 	}
 }
 
@@ -90,6 +110,7 @@ void init_doinit(void) {
 	uint_farptr_t ppe = pgm_get_far_address(__init_processes_end);
 	while (pp < ppe) {
 		struct process *p = (void *)pgm_read_word(pp);
+		printf_P(PSTR("Starting process %S\n"), PROCESS_NAME_STRING(p));
 		process_start(p, NULL);
 		pp += sizeof(struct process *);
 	}
