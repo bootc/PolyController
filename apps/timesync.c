@@ -20,6 +20,7 @@
 
 #include <contiki-net.h>
 #include <sys/stimer.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <init.h>
 #include <alloca.h>
@@ -57,6 +58,7 @@ static int init(void) {
 	int err;
 	struct tm tm;
 	wallclock_time_t new;
+	char date[32];
 #endif
 
 	timesync_event = process_alloc_event();
@@ -85,6 +87,10 @@ static int init(void) {
 
 	// Set the system time from the RTC
 	wallclock_set(&new);
+
+	// Print date retrieved from RTC
+	strftime_P(date, sizeof(date), PSTR("%c"), &tm);
+	printf_P(PSTR("Date from RTC: %s\n"), date);
 #endif
 
 	// Copy the host name into the resolv helper structure
