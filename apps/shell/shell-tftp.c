@@ -34,10 +34,10 @@ static char progress[] PROGMEM = {
 };
 
 PROCESS(shell_tftpupdate_process, "tftpupdate");
-SHELL_COMMAND(shell_tftpupdate_command,
+SHELL_COMMAND(tftpupdate_command,
 	"tftpupdate", "tftpupdate: update firmware over TFTP",
 	&shell_tftpupdate_process);
-INIT_SHELL_COMMAND(shell_tftpupdate_command);
+INIT_SHELL_COMMAND(tftpupdate_command);
 
 struct tftpupdate_params {
 	struct resolv_helper_status res;
@@ -48,7 +48,7 @@ struct tftpupdate_params {
 struct tftpupdate_params *tftpupdate = NULL;
 
 static void tftpupdate_usage(void) {
-	shell_output_P(&shell_tftpupdate_command,
+	shell_output_P(&tftpupdate_command,
 		PSTR("Usage: tftpupdate <server> <filename>\n"));
 }
 
@@ -72,12 +72,12 @@ static int tftpupdate_iofunc(struct tftp_state *s, uint32_t offset,
 	// Write the flash block
 	err = flashmgt_sec_write_block(buf, offset, size);
 	if (err) {
-		shell_output_P(&shell_tftpupdate_command,
+		shell_output_P(&tftpupdate_command,
 			PSTR("\rWrite error %d at block %d\n"),
 			err, s->block);
 	}
 	else {
-		shell_output_P(&shell_tftpupdate_command,
+		shell_output_P(&tftpupdate_command,
 			PSTR("\r%c"),
 			pgm_read_byte(&progress[s->block % sizeof(progress)]));
 	}
@@ -108,7 +108,7 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 
 	// Clean up after a previous run
 	if (tftpupdate) {
-		shell_output_P(&shell_tftpupdate_command,
+		shell_output_P(&tftpupdate_command,
 			PSTR("Previous run failed to clean up after itself! Clobbering.\n"));
 		tftpupdate_cleanup();
 	}
@@ -116,7 +116,7 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 	// Allocate our memory block if necessary
 	tftpupdate = malloc(sizeof(*tftpupdate));
 	if (tftpupdate == NULL) {
-		shell_output_P(&shell_tftpupdate_command,
+		shell_output_P(&tftpupdate_command,
 			PSTR("Out of memory!\n"));
 		PROCESS_EXIT();
 	}
@@ -142,7 +142,7 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 	}
 
 	// Tell the user what's going on
-	shell_output_P(&shell_tftpupdate_command,
+	shell_output_P(&tftpupdate_command,
 		PSTR("Looking up '%s'...\n"), tftpupdate->res.name);
 
 	// Start the lookup
@@ -158,13 +158,13 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 			break;
 		}
 		else if (tftpupdate->res.state == RESOLV_HELPER_STATE_ERROR) {
-			shell_output_P(&shell_tftpupdate_command,
+			shell_output_P(&tftpupdate_command,
 				PSTR("Error during DNS lookup.\n"));
 			tftpupdate_cleanup();
 			PROCESS_EXIT();
 		}
 		else {
-			shell_output_P(&shell_tftpupdate_command,
+			shell_output_P(&tftpupdate_command,
 				PSTR("Error during DNS lookup. (unknown state)\n"));
 			tftpupdate_cleanup();
 			PROCESS_EXIT();
@@ -172,20 +172,20 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 	}
 
 	// Tell the user what's going on
-	shell_output_P(&shell_tftpupdate_command,
+	shell_output_P(&tftpupdate_command,
 		PSTR("Preparing to write to flash...\n"));
 
 	// Start the flash write
 	err = flashmgt_sec_write_start();
 	if (err) {
-		shell_output_P(&shell_tftpupdate_command,
+		shell_output_P(&tftpupdate_command,
 			PSTR("Could not set up flash write (%d).\n"), err);
 		tftpupdate_cleanup();
 		PROCESS_EXIT();
 	}
 
 	// More user info
-	shell_output_P(&shell_tftpupdate_command,
+	shell_output_P(&tftpupdate_command,
 		PSTR("Requesting '%s' from %u.%u.%u.%u...\n"),
 		tftpupdate->filename,
 		uip_ipaddr_to_quad(&tftpupdate->res.ipaddr));
@@ -202,7 +202,7 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 			tftp_appcall(&tftpupdate->s);
 
 			if (tftpupdate->s.state == TFTP_STATE_CLOSE) {
-				shell_output_P(&shell_tftpupdate_command,
+				shell_output_P(&tftpupdate_command,
 					PSTR("\rTransfer complete (%lu bytes read).\n"),
 					tftpupdate->s.size);
 
@@ -211,7 +211,7 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 				break;
 			}
 			else if (tftpupdate->s.state == TFTP_STATE_ERR) {
-				shell_output_P(&shell_tftpupdate_command,
+				shell_output_P(&tftpupdate_command,
 					PSTR("\rAborting due to error.\n"));
 
 				// Abort the flash write
@@ -224,7 +224,7 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 				PROCESS_EXIT();
 			}
 			else if (tftpupdate->s.state == TFTP_STATE_TIMEOUT) {
-				shell_output_P(&shell_tftpupdate_command,
+				shell_output_P(&tftpupdate_command,
 					PSTR("\rTransfer timed out.\n"));
 
 				// Abort the flash write
@@ -240,18 +240,18 @@ PROCESS_THREAD(shell_tftpupdate_process, ev, data) {
 	}
 
 	// Tell the user what's going on
-	shell_output_P(&shell_tftpupdate_command,
+	shell_output_P(&tftpupdate_command,
 		PSTR("Completing update process...\n"));
 
 	// Finish the flash write process
 	err = flashmgt_sec_write_finish();
 	if (err) {
-		shell_output_P(&shell_tftpupdate_command,
+		shell_output_P(&tftpupdate_command,
 			PSTR("Could not apply firmware update (%d)\n"),
 			err);
 	}
 	else {
-		shell_output_P(&shell_tftpupdate_command,
+		shell_output_P(&tftpupdate_command,
 			PSTR("New firmware image is in flash. "
 				"Please reboot to apply the upgrade.\n"),
 			err);

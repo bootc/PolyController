@@ -36,10 +36,10 @@
 #define MAX(a, b) ((a) > (b)? (a): (b))
 
 PROCESS(shell_free_process, "free");
-SHELL_COMMAND(shell_free_command,
+SHELL_COMMAND(free_command,
 	"free", "free: show memory usage",
 	&shell_free_process);
-INIT_SHELL_COMMAND(shell_free_command);
+INIT_SHELL_COMMAND(free_command);
 
 #if PROCESS_CONF_STATS
 extern process_num_events_t process_maxevents;
@@ -85,23 +85,23 @@ PROCESS_THREAD(shell_free_process, ev, data) {
 	const uint16_t stack_free = StackCount();
 
 	// Print header
-	shell_output_P(&shell_free_command,
+	shell_output_P(&free_command,
 		PSTR("           total        used        free\n"));
 
 	// Static memory
-	shell_output_P(&shell_free_command,
+	shell_output_P(&free_command,
 		PSTR("Static:    %5u           -           -\n"),
 		static_end - static_start + 1);
 
 	// Heap memory
-	shell_output_P(&shell_free_command,
+	shell_output_P(&free_command,
 		PSTR("Heap:      %5u       %5u       %5u\n"),
 		heap_end - heap_start + 1,
 		heap_end - heap_start + 1 - heap_free,
 		heap_free);
 
 	// Stack memory
-	shell_output_P(&shell_free_command,
+	shell_output_P(&free_command,
 		PSTR("Stack:     %5u       %5u       %5u\n"),
 		stack_end - stack_start + 1,
 		stack_end - stack_start + 1 - stack_free,
@@ -109,8 +109,8 @@ PROCESS_THREAD(shell_free_process, ev, data) {
 
 #if PROCESS_CONF_STATS
 	// Process event stats
-	shell_output_P(&shell_free_command, PSTR("\n"));
-	shell_output_P(&shell_free_command, PSTR("Max Events: %u\n"),
+	shell_output_P(&free_command, PSTR("\n"));
+	shell_output_P(&free_command, PSTR("Max Events: %u\n"),
 		process_maxevents);
 #endif
 

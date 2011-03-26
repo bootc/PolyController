@@ -30,10 +30,10 @@
 #include <avr/pgmspace.h>
 
 PROCESS(shell_date_process, "date");
-SHELL_COMMAND(shell_date_command,
+SHELL_COMMAND(date_command,
 	"date", "date: show/adjust date/time",
 	&shell_date_process);
-INIT_SHELL_COMMAND(shell_date_command);
+INIT_SHELL_COMMAND(date_command);
 
 #define DATE_MAXLEN 32
 
@@ -51,7 +51,7 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 		gmtime(wallclock_seconds(), &tm);
 		strftime_P(date, DATE_MAXLEN, PSTR("%c"), &tm);
 		
-		shell_output_P(&shell_date_command,
+		shell_output_P(&date_command,
 			PSTR("%s\n"), date);
 
 		free(date);
@@ -60,11 +60,11 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 		if (timesync_status.running) {
 			timesync_schedule_resync();
 			PROCESS_WAIT_EVENT_UNTIL(ev == timesync_event);
-			shell_output_P(&shell_date_command,
+			shell_output_P(&date_command,
 				PSTR("Time was adjusted.\n"));
 		}
 		else {
-			shell_output_P(&shell_date_command,
+			shell_output_P(&date_command,
 				PSTR("TimeSync not running.\n"));
 		}
 	}
@@ -74,12 +74,12 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 
 		uint32_t ms = ((uint32_t)time.frac * 1000) >> 12;
 
-		shell_output_P(&shell_date_command,
+		shell_output_P(&date_command,
 			PSTR("Fractional time (secs since epoch): %ld.%03lus\n"),
 			time.sec, ms);
 	}
 	else {
-		shell_output_P(&shell_date_command,
+		shell_output_P(&date_command,
 			PSTR("Usage: date [--sync|--frac]\n"));
 	}
 

@@ -27,10 +27,10 @@
 #include <avr/pgmspace.h>
 
 PROCESS(shell_log_process, "log");
-SHELL_COMMAND(shell_log_command,
+SHELL_COMMAND(log_command,
 	"log", "log: send something to syslog",
 	&shell_log_process);
-INIT_SHELL_COMMAND(shell_log_command);
+INIT_SHELL_COMMAND(log_command);
 
 PROCESS_THREAD(shell_log_process, ev, data) {
 	char *msg;
@@ -39,7 +39,7 @@ PROCESS_THREAD(shell_log_process, ev, data) {
 
 	msg = data;
 	if (msg == NULL || strlen(msg) == 0) {
-		shell_output_P(&shell_log_command,
+		shell_output_P(&log_command,
 			PSTR("Usage: log <message>\n"));
 		PROCESS_EXIT();
 	}
