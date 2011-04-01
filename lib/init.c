@@ -42,6 +42,7 @@ extern struct init_entry *__init_components_start;
 extern struct init_entry *__init_components_end;
 
 #if __AVR_LIBC_VERSION__ < 10700UL
+#if __AVR_HAVE_ELPM__
 static inline void *memcpy_PF(void *dest, uint_farptr_t src, size_t len) {
 	uint8_t *ptr = dest;
 	while (len--) {
@@ -67,6 +68,10 @@ static inline void *memcpy_PF(void *dest, uint_farptr_t src, size_t len) {
 	);                                                \
 	tmp;                                              \
 })
+#else
+#define memcpy_PF(a, b, c) memcpy_P(a, (void *)(uint16_t)b, c)
+#define pgm_get_far_address(var) ((uint_farptr_t)(uint16_t)&var)
+#endif
 #endif
 
 static void init_call_funcs(uint_farptr_t start, uint_farptr_t end) {

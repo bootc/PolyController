@@ -23,6 +23,8 @@
 #include <init.h>
 #include "monitor.h"
 
+#include <avr/io.h>
+
 #if CONFIG_APPS_NETWORK
 #include "network.h"
 #endif

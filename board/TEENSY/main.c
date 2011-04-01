@@ -19,12 +19,17 @@
  */
 
 #include <contiki-net.h>
+#include <sys/log.h>
 
 #include <stdio.h>
 #include <avr/pgmspace.h>
+#if CONFIG_WATCHDOG
+#include <avr/wdt.h>
+#endif
 
 #include <init.h>
 #include <board.h>
+#include <apps/serial.h>
 
 int main(void) {
 	// Basic board init
@@ -36,10 +41,28 @@ int main(void) {
 	// Enable interrupts
 	sei();
 
+	// Set up printf as early as possible (boot messages)
+	serial_init();
+
 	// Initialise everything else
 	init_doinit();
 
+#if CONFIG_WATCHDOG
+	// Set up the watchdog
+	wdt_enable(CONFIG_WATCHDOG_TIMEOUT);
+#endif
+
+	// Print boot message
+	printf_P(PSTR("\n\n"));
+	printf_P(PSTR("PolyController " CONFIG_BOARD " " CONFIG_IMAGE "\n"));
+	printf_P(PSTR("\n"));
+
 	while (1) {
+#if CONFIG_WATCHDOG
+		// Poke the watchdog
+		wdt_reset();
+#endif
+
 		// Run processes
 		process_run();
 	}
@@ -47,7 +70,12 @@ int main(void) {
 	return 0;
 }
 
-INIT_LIBRARY(process, process_init);
+static int init_contiki(void) {
+	process_init();
+	return 0;
+}
+
+INIT_LIBRARY(contiki, init_contiki);
 INIT_PROCESS(etimer_process);
 
 #if LOG_CONF_ENABLED

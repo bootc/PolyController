@@ -24,7 +24,9 @@
 #include <init.h>
 #include <util/delay.h>
 #include <onewire.h>
+#if CONFIG_APPS_SYSLOG
 #include "syslog.h"
+#endif
 #include "drivers/ds2482.h"
 
 #define OWFSD_PORT 15862
@@ -178,16 +180,20 @@ static int cmd_reset(struct owfsd_state *s) {
 	// Reset the bus
 	int ret = ow_reset();
 	if (ret == -2) {
+#if CONFIG_APPS_SYSLOG
 		// Log something
 		syslog_P(LOG_DAEMON | LOG_ERR,
 			PSTR("1-Wire bus short circuit detected"));
+#endif
 
 		return ERR_OWSD;
 	}
 	else if (ret < 0) {
+#if CONFIG_APPS_SYSLOG
 		// Log something
 		syslog_P(LOG_DAEMON | LOG_ERR,
 			PSTR("1-Wire bus reset failure"));
+#endif
 
 		return ERR_OWERR;
 	}
@@ -243,9 +249,11 @@ static int cmd_search(struct owfsd_state *s) {
 
 	int ret = ow_search_next(&src);
 	if (ret < 0) {
+#if CONFIG_APPS_SYSLOG
 		// Log something
 		syslog_P(LOG_DAEMON | LOG_ERR,
 			PSTR("1-Wire bus search failed"));
+#endif
 
 		return ERR_OWERR;
 	}
@@ -430,10 +438,12 @@ static void owfsd_appcall(void *state) {
 			// Reset the connection so the remote end knows something is up
 			uip_abort();
 
+#if CONFIG_APPS_SYSLOG
 			// Log something
 			syslog_P(LOG_DAEMON | LOG_WARNING,
 				PSTR("%d.%d.%d.%d: too much going on, try later"),
 				uip_ipaddr_to_quad(&uip_conn->ripaddr));
+#endif
 
 			return;
 		}
@@ -443,10 +453,12 @@ static void owfsd_appcall(void *state) {
 		PSOCK_INIT(&s->sock, s->buf_in, OW_BUFLEN);
 		PT_INIT(&s->pt);
 
+#if CONFIG_APPS_SYSLOG
 		// Log something
 		syslog_P(LOG_DAEMON | LOG_INFO,
 			PSTR("%d.%d.%d.%d: Connected"),
 			uip_ipaddr_to_quad(&uip_conn->ripaddr));
+#endif
 
 		// Handle the connection
 		handle_connection(s);

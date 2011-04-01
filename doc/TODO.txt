@@ -1,4 +1,8 @@
 
+* Terminal multiplexer
+ * Telnet server (single session)
+ * Shell on serial _or_ telnet
+
 * owfs code
  * Handle errors better (?)
  * Explicit bus locking
