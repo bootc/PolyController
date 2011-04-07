@@ -98,9 +98,9 @@ static unsigned short generator(void *state) {
 	return fs->ret;
 }
 
-static PT_THREAD(send_part(struct sendfile_state *s, struct psock *sout)) {
+static PT_THREAD(send_part(struct sendfile_state *s, struct psock *sock)) {
 	struct sendfile_file_state *fs = list_head(s->stack);
-	PSOCK_BEGIN(sout);
+	PSOCK_BEGIN(sock);
 
 	// Clear the finish reason
 	s->reason = 0;
@@ -114,7 +114,7 @@ static PT_THREAD(send_part(struct sendfile_state *s, struct psock *sout)) {
 		}
 
 		// Send some of the file
-		PSOCK_GENERATOR_SEND(sout, generator, s);
+		PSOCK_GENERATOR_SEND(sock, generator, s);
 
 		// Move the offset forwards
 		if (fs->ret > 0) {
@@ -127,7 +127,7 @@ static PT_THREAD(send_part(struct sendfile_state *s, struct psock *sout)) {
 		}
 	};
 
-	PSOCK_END(sout);
+	PSOCK_END(sock);
 }
 
 /*
@@ -209,7 +209,7 @@ PT_THREAD(sendfile(struct sendfile_state *s, struct httpd_state *hs)) {
 
 	do {
 		// Send part of the file
-		PT_WAIT_THREAD(&s->pt, send_part(s, &hs->sout));
+		PT_WAIT_THREAD(&s->pt, send_part(s, &hs->sock));
 
 		if (s->reason == REASON_EOF) {
 			// Close one file on the stack

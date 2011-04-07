@@ -37,6 +37,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <avr/pgmspace.h>
+#include <ctype.h>
 
 #include "contiki-net.h"
 
@@ -51,9 +52,6 @@
 #else /* CONFIG_APPS_WEBSERVER_CONNS */
 #define CONNS CONFIG_APPS_WEBSERVER_CONNS
 #endif /* CONFIG_APPS_WEBSERVER_CONNS */
-
-#define STATE_WAITING 0
-#define STATE_OUTPUT  1
 
 #define SEND_PSTR(sock, str) \
 	PSOCK_GENERATOR_SEND(sock, send_pstr_gen, (void *)str)
@@ -78,17 +76,17 @@ static unsigned short send_pstr_gen(void *string) {
 }
 
 static PT_THREAD(send_pstring(struct httpd_state *s, PGM_P str)) {
-	PSOCK_BEGIN(&s->sout);
-	SEND_PSTR(&s->sout, str);
-	PSOCK_END(&s->sout);
+	PSOCK_BEGIN(&s->sock);
+	SEND_PSTR(&s->sock, str);
+	PSOCK_END(&s->sock);
 }
 
 static PT_THREAD(send_headers(struct httpd_state *s, const PGM_P statushdr)) {
 	const char *ptr = NULL;
 	const PGM_P ptr2 = NULL;
 
-	PSOCK_BEGIN(&s->sout);
-	SEND_PSTR(&s->sout, statushdr);
+	PSOCK_BEGIN(&s->sock);
+	SEND_PSTR(&s->sock, statushdr);
 
 	ptr = strrchr(s->filename, '.');
 	if (ptr == NULL) {
@@ -116,75 +114,31 @@ static PT_THREAD(send_headers(struct httpd_state *s, const PGM_P statushdr)) {
 		ptr2 = http_content_type_plain;
 	}
 
-	SEND_PSTR(&s->sout, ptr2);
-	PSOCK_END(&s->sout);
-}
-
-static PT_THREAD(handle_output(struct httpd_state *s)) {
-	PT_BEGIN(&s->outputpt);
-
-	// Default sendfile flags
-	uint8_t flags = SENDFILE_MODE_NORMAL;
-
-	// Work out if it's a script or not
-	char *ptr = strrchr(s->filename, '.');
-	if (ptr != NULL && strncmp_P(ptr, http_shtml, sizeof(http_shtml)) == 0) {
-		flags = SENDFILE_MODE_SCRIPT;
-	}
-
-	// Init sendfile
-	int ret = sendfile_init(&s->sendfile, s->filename, flags);
-	if (ret < 0) {
-		// Open failed, so send a 404 header
-		PT_WAIT_THREAD(&s->outputpt, send_headers(s, http_header_404));
-
-		// Open the 404 notfound.html file
-		strcpy_P(s->filename, PSTR("/notfound.html"));
-		ret = sendfile_init(&s->sendfile, s->filename, SENDFILE_MODE_NORMAL);
-		if (ret < 0) {
-			// We couldn't open the notfound.html file, so just send a string
-			webserver_log_file(&uip_conn->ripaddr, "404 (no notfound.html)");
-
-			PT_WAIT_THREAD(&s->outputpt, send_pstring(s,
-				PSTR("Error 404: resource not found")));
-			uip_close();
-			PT_EXIT(&s->outputpt);
-		}
-
-		webserver_log_file(&uip_conn->ripaddr, "404 /notfound.html");
-	}
-	else {
-		PT_WAIT_THREAD(&s->outputpt, send_headers(s, http_header_200));
-	}
-
-	// Do the work of sending the file (or script)
-	PT_WAIT_THREAD(&s->outputpt, sendfile(&s->sendfile, s));
-
-	// Free sendfile memory
-	sendfile_finish(&s->sendfile);
-
-	// Close the socket & finish up
-	PSOCK_CLOSE(&s->sout);
-	PT_END(&s->outputpt);
+	SEND_PSTR(&s->sock, ptr2);
+	PSOCK_END(&s->sock);
 }
 
 static PT_THREAD(handle_input(struct httpd_state *s)) {
-	PSOCK_BEGIN(&s->sin);
+	PSOCK_BEGIN(&s->sock);
 
-	PSOCK_READTO(&s->sin, ' ');
+	// Read the request method
+	PSOCK_READTO(&s->sock, ' ');
 
+	// At the moment we only support GET
 	if (strncmp_P((char *)s->inputbuf, http_get, 4) != 0) {
-		PSOCK_CLOSE_EXIT(&s->sin);
+		PSOCK_CLOSE_EXIT(&s->sock);
 	}
 
-	PSOCK_READTO(&s->sin, ' ');
+	// Get the query string
+	PSOCK_READTO(&s->sock, ' ');
 
+	// Make sure it starts with a '/'
 	if (s->inputbuf[0] != '/') {
-		PSOCK_CLOSE_EXIT(&s->sin);
+		PSOCK_CLOSE_EXIT(&s->sock);
 	}
 
 	// null-terminate the path string
-	s->inputbuf[PSOCK_DATALEN(&s->sin) - 1] = 0;
+	s->inputbuf[PSOCK_DATALEN(&s->sock) - 1] = 0;
 
 	// prefix the path with '/www'
 	strcpy_P(s->filename, PSTR("/www"));
@@ -203,21 +157,78 @@ static PT_THREAD(handle_input(struct httpd_state *s)) {
 	}
 
 	webserver_log_file(&uip_conn->ripaddr, s->filename);
-	s->state = STATE_OUTPUT;
+
+	// Skip past the HTTP protocol version
+	PSOCK_READTO(&s->sock, '\n');
 
 	while (1) {
-		PSOCK_READTO(&s->sin, '\n');
+		PSOCK_READTO(&s->sock, '\n');
+
+		int len = PSOCK_DATALEN(&s->sock);
+
+		// Trim trailing whitespace
+		while (isspace(s->inputbuf[len - 1])) {
+			s->inputbuf[len - 1] = 0;
+			len--;
+		}
+
+		// Empty line means end of headers
+		if (len == 0) {
+			break;
+		}
 	}
 
-	PSOCK_END(&s->sin);
+	PSOCK_END(&s->sock);
 }
 
-static void handle_connection(struct httpd_state *s) {
-	handle_input(s);
+static PT_THREAD(handle_connection(struct httpd_state *s)) {
+	PT_BEGIN(&s->pt);
 
-	if (s->state == STATE_OUTPUT) {
-		handle_output(s);
+	PT_WAIT_THREAD(&s->pt, handle_input(s));
+
+	// Default sendfile flags
+	uint8_t flags = SENDFILE_MODE_NORMAL;
+
+	// Work out if it's a script or not
+	char *ptr = strrchr(s->filename, '.');
+	if (ptr != NULL && strncmp_P(ptr, http_shtml, sizeof(http_shtml)) == 0) {
+		flags = SENDFILE_MODE_SCRIPT;
 	}
+
+	// Init sendfile
+	int ret = sendfile_init(&s->sendfile, s->filename, flags);
+	if (ret < 0) {
+		// Open failed, so send a 404 header
+		PT_WAIT_THREAD(&s->pt, send_headers(s, http_header_404));
+
+		// Open the 404 notfound.html file
+		strcpy_P(s->filename, PSTR("/notfound.html"));
+		ret = sendfile_init(&s->sendfile, s->filename, SENDFILE_MODE_NORMAL);
+		if (ret < 0) {
+			// We couldn't open the notfound.html file, so just send a string
+			webserver_log_file(&uip_conn->ripaddr, "404 (no notfound.html)");
+
+			PT_WAIT_THREAD(&s->pt, send_pstring(s,
+				PSTR("Error 404: resource not found")));
+			uip_close();
+			PT_EXIT(&s->pt);
+		}
+
+		webserver_log_file(&uip_conn->ripaddr, "404 /notfound.html");
+	}
+	else {
+		PT_WAIT_THREAD(&s->pt, send_headers(s, http_header_200));
+	}
+
+	// Do the work of sending the file (or script)
+	PT_WAIT_THREAD(&s->pt, sendfile(&s->sendfile, s));
+
+	// Free sendfile memory
+	sendfile_finish(&s->sendfile);
+
+	// Close the socket & finish up
+	PSOCK_CLOSE(&s->sock);
+	PT_END(&s->pt);
 }
 
 void httpd_appcall(void *state) {
@@ -253,10 +264,8 @@ void httpd_appcall(void *state) {
 
 		// Set up the connection
 		tcp_markconn(uip_conn, s);
-		PSOCK_INIT(&s->sin, (uint8_t *)s->inputbuf, sizeof(s->inputbuf) - 1);
-		PSOCK_INIT(&s->sout, (uint8_t *)s->inputbuf, sizeof(s->inputbuf) - 1);
-		PT_INIT(&s->outputpt);
-		s->state = STATE_WAITING;
+		PSOCK_INIT(&s->sock, (uint8_t *)s->inputbuf, sizeof(s->inputbuf) - 1);
+		PT_INIT(&s->pt);
 		timer_set(&s->timer, CLOCK_SECOND * 10);
 		handle_connection(s);
 	}

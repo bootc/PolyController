@@ -52,8 +52,8 @@
 static struct httpd_cgi_call *calls = NULL;
 
 static PT_THREAD(nullfunction(struct httpd_state *s, char *ptr)) {
-	PSOCK_BEGIN(&s->sout);
-	PSOCK_END(&s->sout);
+	PSOCK_BEGIN(&s->sock);
+	PSOCK_END(&s->sock);
 }
 
 httpd_cgifunction httpd_cgi(char *name) {

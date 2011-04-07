@@ -46,13 +46,10 @@
 
 struct httpd_state {
 	struct timer timer;
-	struct psock sin;
-	struct psock sout;
-	struct pt outputpt;
-	struct pt scriptpt;
+	struct psock sock;
+	struct pt pt;
 	uint8_t inputbuf[HTTPD_PATHLEN + 30];
 	char filename[HTTPD_PATHLEN];
-	char state;
 	struct sendfile_state sendfile;
 };
 
