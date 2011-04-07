@@ -124,39 +124,47 @@ static PT_THREAD(handle_input(struct httpd_state *s)) {
 	// Read the request method
 	PSOCK_READTO(&s->sock, ' ');
 
-	// At the moment we only support GET
-	if (strncmp_P((char *)s->inputbuf, http_get, 4) != 0) {
-		PSOCK_CLOSE_EXIT(&s->sock);
+	// Work out the request method
+	if (strncmp_P((char *)s->inputbuf, http_get, 4) == 0) {
+		s->method = HTTPD_METHOD_GET;
+	}
+	else if (strncmp_P((char *)s->inputbuf, http_post, 4) == 0) {
+		s->method = HTTPD_METHOD_POST;
+	}
+	else {
+		s->method = HTTPD_METHOD_INVALID;
 	}
 
 	// Get the query string
 	PSOCK_READTO(&s->sock, ' ');
 
-	// Make sure it starts with a '/'
-	if (s->inputbuf[0] != '/') {
-		PSOCK_CLOSE_EXIT(&s->sock);
-	}
-
 	// null-terminate the path string
 	s->inputbuf[PSOCK_DATALEN(&s->sock) - 1] = 0;
 
-	// prefix the path with '/www'
-	strcpy_P(s->filename, PSTR("/www"));
+	// Make sure it starts with a '/'
+	if (s->inputbuf[0] == '/') {
+		// prefix the path with '/www'
+		strcpy_P(s->filename, PSTR("/www"));
 
-	// Use urlconv to sanitise the path
-	int idx = strlen(s->filename);
-	urlconv_tofilename(&s->filename[idx], (char *)s->inputbuf,
-		sizeof(s->filename) - idx);
+		// Use urlconv to sanitise the path
+		int idx = strlen(s->filename);
+		urlconv_tofilename(&s->filename[idx], (char *)s->inputbuf,
+			sizeof(s->filename) - idx);
 
-	// Append 'index.html' if necessary
-	idx = strlen(s->filename);
-	if (s->filename[idx - 1] == '/' &&
-		idx <= sizeof(s->filename) - sizeof(http_index_html))
-	{
-		strcpy_P(&s->filename[idx - 1], http_index_html);
+		// Append 'index.html' if necessary
+		idx = strlen(s->filename);
+		if (s->filename[idx - 1] == '/' &&
+			idx <= sizeof(s->filename) - sizeof(http_index_html))
+		{
+			strcpy_P(&s->filename[idx - 1], http_index_html);
+		}
+
+		webserver_log_file(&uip_conn->ripaddr, s->filename);
 	}
-
-	webserver_log_file(&uip_conn->ripaddr, s->filename);
+	else {
+		// Invalid path
+		s->filename[0] = 0;
+	}
 
 	// Skip past the HTTP protocol version
 	PSOCK_READTO(&s->sock, '\n');
@@ -184,47 +192,65 @@ static PT_THREAD(handle_input(struct httpd_state *s)) {
 static PT_THREAD(handle_connection(struct httpd_state *s)) {
 	PT_BEGIN(&s->pt);
 
+	// Read the request
 	PT_WAIT_THREAD(&s->pt, handle_input(s));
 
-	// Default sendfile flags
-	uint8_t flags = SENDFILE_MODE_NORMAL;
-
-	// Work out if it's a script or not
-	char *ptr = strrchr(s->filename, '.');
-	if (ptr != NULL && strncmp_P(ptr, http_shtml, sizeof(http_shtml)) == 0) {
-		flags = SENDFILE_MODE_SCRIPT;
+	if ((s->method == HTTPD_METHOD_INVALID) ||
+		(s->filename[0] == 0))
+	{
+		// Bad request
+		PT_WAIT_THREAD(&s->pt, send_pstring(s, http_header_400));
 	}
+	else if (s->method == HTTPD_METHOD_GET) {
+		// Default sendfile flags
+		uint8_t flags = SENDFILE_MODE_NORMAL;
 
-	// Init sendfile
-	int ret = sendfile_init(&s->sendfile, s->filename, flags);
-	if (ret < 0) {
-		// Open failed, so send a 404 header
-		PT_WAIT_THREAD(&s->pt, send_headers(s, http_header_404));
-
-		// Open the 404 notfound.html file
-		strcpy_P(s->filename, PSTR("/notfound.html"));
-		ret = sendfile_init(&s->sendfile, s->filename, SENDFILE_MODE_NORMAL);
-		if (ret < 0) {
-			// We couldn't open the notfound.html file, so just send a string
-			webserver_log_file(&uip_conn->ripaddr, "404 (no notfound.html)");
-
-			PT_WAIT_THREAD(&s->pt, send_pstring(s,
-				PSTR("Error 404: resource not found")));
-			uip_close();
-			PT_EXIT(&s->pt);
+		// Work out if it's a script or not
+		char *ptr = strrchr(s->filename, '.');
+		if (ptr != NULL && strncmp_P(ptr, http_shtml, sizeof(http_shtml)) == 0) {
+			flags = SENDFILE_MODE_SCRIPT;
 		}
 
-		webserver_log_file(&uip_conn->ripaddr, "404 /notfound.html");
+		// Init sendfile
+		int ret = sendfile_init(&s->sendfile, s->filename, flags);
+		if (ret < 0) {
+			// Replace the filename as send_headers guesses the content type
+			strcpy_P(s->filename, PSTR("/notfound.html"));
+
+			// Open failed, so send a 404 header
+			PT_WAIT_THREAD(&s->pt, send_headers(s, http_header_404));
+
+			// Open the 404 notfound.html file
+			ret = sendfile_init(&s->sendfile, s->filename,
+				SENDFILE_MODE_NORMAL);
+			if (ret < 0) {
+				// We couldn't open the notfound.html file
+				webserver_log_file(&uip_conn->ripaddr,
+					"404 (no notfound.html)");
+
+				PT_WAIT_THREAD(&s->pt,
+					send_pstring(s, PSTR("Error 404: resource not found")));
+
+				PSOCK_CLOSE(&s->sock);
+				PT_EXIT(&s->pt);
+			}
+
+			webserver_log_file(&uip_conn->ripaddr, "404 /notfound.html");
+		}
+		else {
+			PT_WAIT_THREAD(&s->pt, send_headers(s, http_header_200));
+		}
+
+		// Do the work of sending the file (or script)
+		PT_WAIT_THREAD(&s->pt, sendfile(&s->sendfile, s));
+
+		// Free sendfile memory
+		sendfile_finish(&s->sendfile);
 	}
 	else {
-		PT_WAIT_THREAD(&s->pt, send_headers(s, http_header_200));
+		// Bad request (we don't do POST yet)
+		PT_WAIT_THREAD(&s->pt, send_pstring(s, http_header_400));
 	}
-
-	// Do the work of sending the file (or script)
-	PT_WAIT_THREAD(&s->pt, sendfile(&s->sendfile, s));
-
-	// Free sendfile memory
-	sendfile_finish(&s->sendfile);
 
 	// Close the socket & finish up
 	PSOCK_CLOSE(&s->sock);

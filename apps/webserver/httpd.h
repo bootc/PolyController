@@ -44,11 +44,16 @@
 #define HTTPD_PATHLEN CONFIG_APPS_WEBSERVER_PATHLEN
 #endif /* CONFIG_APPS_WEBSERVER_PATHLEN */
 
+#define HTTPD_METHOD_INVALID 0
+#define HTTPD_METHOD_GET 1
+#define HTTPD_METHOD_POST 2
+
 struct httpd_state {
 	struct timer timer;
 	struct psock sock;
 	struct pt pt;
 	uint8_t inputbuf[HTTPD_PATHLEN + 30];
+	uint8_t method;
 	char filename[HTTPD_PATHLEN];
 	struct sendfile_state sendfile;
 };
