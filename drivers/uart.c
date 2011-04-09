@@ -515,6 +515,11 @@ void uart_puts_p(const char *progmem_s )
 
 }/* uart_puts_p */
 
+void uart_txwait(void) {
+	while (UART_TxHead != UART_TxTail) {}
+}
+
+
 
 /*
  * these functions are only for ATmegas with two USART
@@ -696,5 +701,8 @@ void uart1_puts_p(const char *progmem_s )
 
 }/* uart1_puts_p */
 
+void uart1_txwait(void) {
+	while (UART1_TxHead != UART1_TxTail) {}
+}
 
 #endif

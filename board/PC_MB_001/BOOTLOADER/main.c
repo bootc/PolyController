@@ -29,12 +29,27 @@
 #include <init.h>
 #include <polyfs.h>
 #include <flashmgt.h>
+#include <settings.h>
 #include "drivers/uart.h"
+
+#if CONFIG_LIB_OPTIBOOT
+#include <optiboot.h>
+#endif
+
+#define VERSION "1.0.0"
 
 uint8_t mcusr_mirror __attribute__ ((section (".noinit")));
 
 typedef void (*bootloader_jump_type)(void) __attribute__((__noreturn__));
 bootloader_jump_type app_start_real = (bootloader_jump_type)0x0000;
+
+typedef enum {
+	BOOT_MODE_APP = 0,		// Immediately launch the application
+	BOOT_MODE_DELAY = 1,	// Let things settle, then watchdog reboot
+	BOOT_MODE_UPDATE = 2,	// Apply software upgrade from FLASH
+	BOOT_MODE_RESCUE = 3,	// Arduino-style bootloader
+	BOOT_MODE_WIPE = 4,		// Erase EEPROM settings
+} boot_mode_t;
 
 void early_init(void)
 	__attribute__((naked))
@@ -67,34 +82,144 @@ static void reboot(void) {
 	while (1);
 }
 
+#define JPORT PORTD
+#define JDDR DDRD
+#define JPIN PIND
+
+static inline int check_jumper_lo(uint8_t pa, uint8_t pb) {
+	// Set pa output low, pb to input w/ pullup
+	JDDR = (JDDR & ~_BV(pb)) | _BV(pa);
+	JPORT = (JPORT & ~_BV(pa)) | _BV(pb);
+
+	_delay_us(10);
+
+	if (JPIN & _BV(pb)) {
+		return 0;
+	}
+	else {
+		return 1;
+	}
+}
+
+static inline int check_jumper_hi(uint8_t pa, uint8_t pb) {
+	// Set pa output high, pb to input w/o pullup
+	JDDR = (JDDR & ~_BV(pb)) | _BV(pa);
+	JPORT = (JPORT & ~_BV(pb)) | _BV(pa);
+
+	_delay_us(10);
+
+	if (JPIN & _BV(pb)) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+static int check_jumper(uint8_t pa, uint8_t pb) {
+	uint8_t tries = 3;
+
+	do {
+		if (!check_jumper_lo(pa, pb)) {
+			break;
+		}
+		if (!check_jumper_hi(pa, pb)) {
+			break;
+		}
+		if (!check_jumper_lo(pb, pa)) {
+			break;
+		}
+		if (!check_jumper_hi(pb, pa)) {
+			break;
+		}
+	} while (--tries);
+
+	return (tries == 0);
+}
+
+static uint8_t check_jumpers(void) {
+	uint8_t jumpers = 0;
+
+	// Save port state
+	uint8_t port = JPORT;
+	uint8_t ddr = JDDR;
+
+	// Vertical jumpers
+	if (check_jumper(PIND2, PIND3)) {
+		jumpers |= 0x01;
+	}
+	if (check_jumper(PIND4, PIND5)) {
+		jumpers |= 0x02;
+	}
+	// Horizontal jumpers
+	if (check_jumper(PIND2, PIND4)) {
+		jumpers |= 0x04;
+	}
+	if (check_jumper(PIND3, PIND5)) {
+		jumpers |= 0x08;
+	}
+
+	// Restore port state
+	JPORT = port;
+	JDDR = ddr;
+
+	return jumpers;
+}
+
 int main(void) {
-	bool delay_boot = true;
-	bool start_app = true;
-	bool rescue = false;
+	// Default to delayed boot mode
+	boot_mode_t mode = BOOT_MODE_DELAY;
 
 	// Basic board init
 	board_init();
 
 	// Check for watchdog or JTAG reset
 	if (mcusr_mirror & (_BV(WDRF) | _BV(JTRF))) {
-		delay_boot = false;
+		mode = BOOT_MODE_APP;
 	}
 
 	// Check if the application area has some code in it
 	if (pgm_read_byte(app_start_real) == 0xff) {
-		start_app = false;
-		rescue = true;
+		mode = BOOT_MODE_RESCUE;
 	}
 
 	// Check if there's a code update lined up
 	if (flashmgt_update_pending()) {
-		start_app = false;
-		rescue = false;
+		mode = BOOT_MODE_UPDATE;
+	}
+
+	// Check for jumpers which will force a boot mode
+	uint8_t jumpers = check_jumpers();
+	if (jumpers) {
+		if (jumpers == 0x01) {
+			mode = BOOT_MODE_RESCUE;
+		}
+		else if (jumpers == 0x02) {
+			mode = BOOT_MODE_WIPE;
+		}
+/*
+		else if (jumpers == 0x03) {
+		}
+		else if (jumpers == 0x04) {
+		}
+		else if (jumpers == 0x08) {
+		}
+		else if (jumpers == 0x0C) {
+		}
+*/
 	}
 
 	// Start the app now if we're not delaying or upgrading
-	if (start_app && !delay_boot) {
+	if (mode == BOOT_MODE_APP) {
 		app_start();
+	}
+
+	// Flash diagnostic LEDs
+	for (int i = 0; i < 4; i++) {
+		CONFIG_DIAG_PORT = 0x80;
+		_delay_ms(125);
+		CONFIG_DIAG_PORT = mode | 0x80;
+		_delay_ms(125);
 	}
 
 	// Move interrupt vectors to bootloader section
@@ -113,30 +238,31 @@ int main(void) {
 		(UBRRL_VALUE << 0) |
 		(USE_2X ? 0x8000 : 0));
 
+	// Enter rescue mode
+	if (mode == BOOT_MODE_RESCUE) {
+		// Start our hacked optiboot loader
+		optiboot();
+
+		// Reboot when finished
+		reboot();
+	}
+
 	// Clear screen
 	uart_puts("\r\n\x1b[H\x1b[J");
 
 	// Print boot message
-	uart_puts("PolyController " CONFIG_BOARD " " CONFIG_IMAGE "\r\n\r\n");
+	uart_puts("PolyController " CONFIG_BOARD " " CONFIG_IMAGE
+		" v" VERSION "\r\n\r\n");
 
-	// Initialise everything else
+	// Initialise peripherals & libraries
 	init_doinit();
 
-	// Delay boot?
-	if (delay_boot) {
-		// Do a little LED dance on the diag port while things settle
-		for (int i = 0; i <= 7; i++) {
-			PORTA |= _BV(i);
-			_delay_ms(125);
-		}
-		for (int i = 0; i <= 7; i++) {
-			PORTA &= ~_BV(i);
-			_delay_ms(125);
-		}
+	if (mode == BOOT_MODE_DELAY) {
+		// No need to do anything, just reboot
+		uart_txwait();
+		reboot();
 	}
-
-	// Check to see if we need to update the MCU flash
-	if (flashmgt_update_pending()) {
+	else if (mode == BOOT_MODE_UPDATE) {
 		uart_puts("Applying code update. Please wait...\r\n");
 
 		// Run the flashmgmt bootloader code
@@ -147,19 +273,27 @@ int main(void) {
 		else {
 			uart_puts("Code has been updated.\r\n");
 		}
+
+		// Reboot
+		uart_txwait();
+		reboot();
 	}
-	else if (rescue) {
-		// FIXME: Some sort of rescue mode?
-		uart_puts("Rescue mode not yet implemented. Hanging.\r\n");
-		while (1) {
-			PORTA = 0xaa;
-			_delay_ms(200);
-			PORTA = 0x55;
-			_delay_ms(200);
-		};
+	else if (mode == BOOT_MODE_WIPE) {
+		uart_puts("Erasing all settings. Please wait...\r\n");
+
+		// Wipe EEPROM
+		settings_wipe();
+
+		uart_puts("Settings have been erased.\r\n"
+			"*** Perform a firmware upgrade to ensure "
+			"correct operation. ***\r\n"
+			"Remove jumper and cycle power to continue.\r\n");
+	}
+	else {
+		uart_puts("Unknown boot mode (bootloader internal error).\r\n");
 	}
 
-	// Reset ourselves
-	reboot();
+	uart_txwait();
+	abort();
 }
 

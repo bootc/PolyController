@@ -172,6 +172,7 @@ extern void uart_puts_p(const char *s );
  */
 #define uart_puts_P(__s)       uart_puts_p(PSTR(__s))
 
+extern void uart_txwait(void);
 
 
 /** @brief  Initialize USART1 (only available on selected ATmegas) @see uart_init */
@@ -186,6 +187,8 @@ extern void uart1_puts(const char *s );
 extern void uart1_puts_p(const char *s );
 /** @brief  Macro to automatically put a string constant into program memory */
 #define uart1_puts_P(__s)       uart1_puts_p(PSTR(__s))
+
+extern void uart1_txwait(void);
 
 /**@}*/
 
