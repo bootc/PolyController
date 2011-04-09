@@ -46,10 +46,10 @@ PROCESS_THREAD(monitor_process, ev, data) {
 #if CONFIG_APPS_NETWORK
 		if (ev == net_event) {
 			if (net_status.configured) {
-				PORTA |= _BV(PINA1);
+				CONFIG_DIAG_PORT |= _BV(CONFIG_DIAG_PIN1);
 			}
 			else {
-				PORTA &= ~_BV(PINA1);
+				CONFIG_DIAG_PORT &= ~_BV(CONFIG_DIAG_PIN1);
 			}
 		}
 		else
@@ -61,7 +61,7 @@ PROCESS_THREAD(monitor_process, ev, data) {
 				etimer_restart(&heartbeat);
 
 				// Toggle heartbeat LED
-				PORTA ^= _BV(PINA0);
+				CONFIG_DIAG_PORT ^= _BV(CONFIG_DIAG_PIN0);
 			}
 		}
 		else if (ev == PROCESS_EVENT_EXIT) {
