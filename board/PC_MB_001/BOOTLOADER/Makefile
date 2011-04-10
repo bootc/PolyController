@@ -7,10 +7,10 @@ LDFLAGS += -Wl,--section-start=.text=$(CONFIG_BOOTLDR_START_ADDR)
 
 # Fuse values
 EFUSE =  0xFD	# default FF (BOD 2.7V)
-HFUSE =  0x90	# default 99 (bootrst + eesave)
+HFUSE =  0xD0	# default 99 (bootrst + eesave)
 LFUSE =  0xF7	# default 62 (no clock div, crystal osc, slow power)
 UNLOCK = 0x3F	# everything unlocked
-LOCK =   0x0F	# BLB12 and BLB11 programmed
+LOCK =   0x2F	# BLB11 programmed (no SPM in bootloader section)
 
 # Special programming rule for the bootloader
 program_bl: $(TARGET).hex $(TARGET).eep

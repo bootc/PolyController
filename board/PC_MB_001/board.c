@@ -38,8 +38,8 @@
  *	Port C:
  *	 0:	(I)		I2C_SCL
  *	 1: (I)		I2C_SDA
- *	 2: (O,H)	OUT_OE
- *	 3: (O,L)	OUT_LATCH
+ *	 2: (O,L)	OUT_OE
+ *	 3: (O,H)	OUT_LATCH
  *	 4: (O,L)	OUT_DATA
  *	 5: (O,L)	OUT_CLOCK
  *	 6: (I,PU)	RTC_CLK
@@ -86,7 +86,7 @@ void board_init(void) {
 		_BV(PINC4) |
 		_BV(PINC5);
 	PORTC =
-		_BV(PINC2) |
+		_BV(PINC3) |
 		_BV(PINC6) |
 		_BV(PINC7);
 
