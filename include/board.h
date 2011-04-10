@@ -21,6 +21,24 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include <verify.h>
+
+#define BOARD_INFO_ADDR 0x010
+
+struct board_info {
+	uint16_t crc16;			// CRC16 of info block
+	char model[32];			// Model name, UTF-8, null-padded
+	char hw_rev[8];			// Hardware revision, UTF-8, null-padded
+	char serial[8];			// Serial number, UTF-8, null-padded
+	uint16_t mfr_year;		// Year of manufacture
+	uint8_t mfr_month;		// Month of manufacture
+	uint8_t mfr_day;		// Day of manufacture
+	uint8_t padding[10];	// Reserved for future use, set to 0xff
+};
+
+// Compile-time check of struct size
+verify(sizeof(struct board_info) == 64);
+
 // Call this to set up IO pins
 void board_init(void);
 

@@ -27,6 +27,7 @@
 #include <init.h>
 #include <settings.h>
 #include <string.h>
+#include <verify.h>
 
 #if CONFIG_WATCHDOG
 #include <avr/wdt.h>
@@ -59,6 +60,9 @@ struct flashmgt_status {
 	uint8_t update_pending : 1;
 	uint8_t padding[3];
 };
+
+// Compile-time check of struct size
+verify(sizeof(struct flashmgt_status) == 4);
 
 static struct flashmgt_partition part[] = {
 	{ .start = CONFIG_FLASHMGT_P1_START, .end = CONFIG_FLASHMGT_P1_END },
