@@ -26,7 +26,7 @@
 #define BOARD_INFO_ADDR 0x010
 
 struct board_info {
-	uint16_t crc16;			// CRC16 of info block
+	uint16_t crc;			// CRC-CCITT of info block
 	char model[32];			// Model name, UTF-8, null-padded
 	char hw_rev[8];			// Hardware revision, UTF-8, null-padded
 	char serial[8];			// Serial number, UTF-8, null-padded
@@ -41,5 +41,9 @@ verify(sizeof(struct board_info) == 64);
 
 // Call this to set up IO pins
 void board_init(void);
+
+// Board info functions
+void board_info_read(struct board_info *info);
+int board_info_validate(const struct board_info *info);
 
 #endif // BOARD_H

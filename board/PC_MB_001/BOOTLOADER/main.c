@@ -36,8 +36,6 @@
 #include <optiboot.h>
 #endif
 
-#define VERSION "1.0.0"
-
 uint8_t mcusr_mirror __attribute__ ((section (".noinit")));
 
 typedef void (*bootloader_jump_type)(void) __attribute__((__noreturn__));
@@ -252,7 +250,7 @@ int main(void) {
 
 	// Print boot message
 	uart_puts("PolyController " CONFIG_BOARD " " CONFIG_IMAGE
-		" v" VERSION "\r\n\r\n");
+		" v" CONFIG_VERSION "\r\n\r\n");
 
 	// Initialise peripherals & libraries
 	init_doinit();

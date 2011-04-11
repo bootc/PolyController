@@ -19,6 +19,7 @@
  */
 
 #include <avr/io.h>
+#include <avr/eeprom.h>
 #include "board.h"
 
 /*
@@ -97,5 +98,34 @@ void board_init(void) {
 		_BV(PIND5) |
 		_BV(PIND6) |
 		_BV(PIND7);
+}
+
+// Read the board info block out of EEPROM
+void board_info_read(struct board_info *info) {
+	const void *eeptr = (const void *)BOARD_INFO_ADDR;
+	eeprom_read_block(info, eeptr, sizeof(*info));
+}
+
+// _crc_ccitt_update from util/crc16.h is Kermit CRC, not what we want
+uint16_t crc_ccitt_update(uint16_t crc, uint8_t x) {
+	uint16_t crc_new = (uint8_t)(crc >> 8) | (crc << 8);
+	crc_new ^= x;
+	crc_new ^= (unsigned char)(crc_new & 0xff) >> 4;
+	crc_new ^= crc_new << 12;
+	crc_new ^= (crc_new & 0xff) << 5;
+	return crc_new;
+}
+
+// Validate the board info block
+int board_info_validate(const struct board_info *info) {
+	const uint8_t *u8 = (const uint8_t *)info;
+	uint16_t crc = 0xffff;
+
+	// Calculate CRC of entire block minus the CRC at the start
+	for (int i = sizeof(crc); i < sizeof(*info); i++) {
+		crc = crc_ccitt_update(crc, u8[i]);
+	}
+
+	return (crc == info->crc) ? 0 : -1;
 }
 

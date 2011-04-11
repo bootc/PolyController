@@ -121,6 +121,13 @@ for my $cfg_dir (@cfg_dirs) {
 			print CONFIG_MK "CONFIG_$var=$value\n";
 			print CONFIG_H  "#define CONFIG_$var $value\n";
 		}
+		elsif (/^(\w+)="(\S+)"$/) {
+			my $var = $1;
+			my $value = $2;
+
+			print CONFIG_MK "CONFIG_$var=\"$value\"\n";
+			print CONFIG_H  "#define CONFIG_$var \"$value\"\n";
+		}
 		else {
 			die "$prg: syntax error: $_\n";
 		}

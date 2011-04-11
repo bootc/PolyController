@@ -24,10 +24,11 @@ $(BUILDDIR)/fsroot: $(IMAGE_DIR)/fsroot $(TARGET).bin
 	cp $(TARGET).bin "$(BUILDDIR)"/fsroot/system.bin
 	touch "$(BUILDDIR)/fsroot"
 
-$(BUILDDIR)/fsroot/www/version.shtml: $(TARGET).bin
+$(BUILDDIR)/fsroot/www/version.shtml: $(TARGET).bin $(BUILDDIR)/config.h
 	@echo "%!:/head.html" > $@
 	@echo "<h1>Build &amp; Version Information</h1>" >> $@
 	@echo "<pre>" >> $@
+	@echo "Version Number: $(CONFIG_VERSION)" >> $@
 	@echo -n "Build Date: " >> $@
 	@date -r $(TARGET).bin >> $@
 	@svn info . | grep Revision >> $@

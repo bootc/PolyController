@@ -449,6 +449,7 @@ static int read_super(polyfs_fs_t *fs) {
 	// Copy over a few more things
 	fs->sb.blocks = POLYFS_32(super.fsid.blocks);
 	fs->sb.files = POLYFS_32(super.fsid.files);
+	fs->sb.crc = POLYFS_32(super.fsid.crc);
 
 	// Work out the root node's offset
 	root_offset = POLYFS_GET_OFFSET(&super.root) << 2;

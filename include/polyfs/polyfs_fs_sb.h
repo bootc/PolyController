@@ -34,6 +34,7 @@ struct polyfs_sb_info {
 	uint32_t blocks;
 	uint32_t files;
 	uint32_t flags;
+	uint32_t crc;
 };
 
 #endif
