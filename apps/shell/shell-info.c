@@ -18,14 +18,14 @@
  * MA 02110-1301, USA.
  */
 
-#include <contiki.h>
+#include <contiki-net.h>
 #include <stdarg.h>
 #include <board.h>
 #include <polyfs.h>
 #include <flashmgt.h>
 #include "shell.h"
+#include "apps/network.h"
 
-#include <string.h>
 #include <avr/pgmspace.h>
 
 PROCESS(shell_info_process, "info");
@@ -36,6 +36,7 @@ INIT_SHELL_COMMAND(info_command);
 
 PROCESS_THREAD(shell_info_process, ev, data) {
 	struct board_info bi;
+	struct uip_eth_addr mac;
 
 	PROCESS_BEGIN();
 
@@ -54,6 +55,9 @@ PROCESS_THREAD(shell_info_process, ev, data) {
 	shell_output_P(&info_command,
 		PSTR("\n"));
 
+	shell_output_P(&info_command,
+		PSTR("Hardware Information:\n"));
+
 	// Read hardware info
 	board_info_read(&bi);
 
@@ -66,8 +70,6 @@ PROCESS_THREAD(shell_info_process, ev, data) {
 	}
 	else {
 		shell_output_P(&info_command,
-			PSTR("Hardware Information:\n"));
-		shell_output_P(&info_command,
 			PSTR("  Model:     %s\n"), bi.model);
 		shell_output_P(&info_command,
 			PSTR("  Revision:  %s\n"), bi.hw_rev);
@@ -77,6 +79,13 @@ PROCESS_THREAD(shell_info_process, ev, data) {
 			PSTR("  Mfr. Date: %04d-%02d-%02d\n"),
 			bi.mfr_year, bi.mfr_month, bi.mfr_day);
 	}
+
+	// Show the MAC address
+	network_get_macaddr(&mac);
+	shell_output_P(&info_command,
+		PSTR("  MAC Addr:  %02x:%02x:%02x:%02x:%02x:%02x\n"),
+		mac.addr[0], mac.addr[1], mac.addr[2],
+		mac.addr[3], mac.addr[4], mac.addr[5]);
 
 	shell_output_P(&info_command,
 		PSTR("\n"));

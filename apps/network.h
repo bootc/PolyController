@@ -31,4 +31,6 @@ typedef struct {
 extern process_event_t net_event;
 extern network_status_t net_status;
 
+void network_get_macaddr(struct uip_eth_addr *addr);
+
 #endif

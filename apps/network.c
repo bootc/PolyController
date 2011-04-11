@@ -102,6 +102,17 @@ static void tcpdump(uint8_t *pkt, uint16_t len) {
 }
 #endif
 
+void network_get_macaddr(struct uip_eth_addr *addr) {
+#if CONFIG_DRIVERS_ENC28J60
+	// Set our MAC address
+	memcpy_P(addr, &mac, sizeof(mac));
+#endif
+#if CONFIG_DRIVERS_ENC424J600
+	// Get the MAC address
+	enc424j600GetMACAddr(addr->addr);
+#endif
+}
+
 static uint16_t network_read(void) {
 	uint16_t len;
 
