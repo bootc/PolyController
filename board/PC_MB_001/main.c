@@ -44,6 +44,12 @@ int main(void) {
 	// Set up printf as early as possible (boot messages)
 	serial_init();
 
+	// Print boot message
+	printf_P(PSTR("\n"));
+	printf_P(PSTR("PolyController " CONFIG_BOARD " " CONFIG_IMAGE
+		" v" CONFIG_VERSION "\n"));
+	printf_P(PSTR("\n"));
+
 	// Initialise everything else
 	init_doinit();
 
@@ -52,9 +58,6 @@ int main(void) {
 	wdt_enable(CONFIG_WATCHDOG_TIMEOUT);
 #endif
 
-	// Print boot message
-	printf_P(PSTR("\n\n"));
-	printf_P(PSTR("PolyController " CONFIG_BOARD " " CONFIG_IMAGE "\n"));
 	printf_P(PSTR("\n"));
 
 	while (1) {
