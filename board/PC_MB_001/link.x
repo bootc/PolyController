@@ -74,6 +74,12 @@ SECTIONS
   {
     *(.vectors)
     KEEP(*(.vectors))
+
+    . = 0x90;
+     __version_info = . ;
+    *(_version_info)
+    KEEP(*(_version_info))
+
     /* For data that needs to reside in the lower 64k of progmem.  */
     *(.progmem.gcc*)
     *(.progmem*)

@@ -61,6 +61,16 @@
 #error Wrong MCU type selected!
 #endif
 
+static struct version_info version_info
+	__attribute__((used))
+	__attribute__((section("_version_info")))
+= {
+	.major = CONFIG_VERSION_MAJOR,
+	.minor = CONFIG_VERSION_MINOR,
+	.patch = CONFIG_VERSION_PATCH,
+	.str = CONFIG_VERSION,
+};
+
 // This gets called to set up the IO pins
 void board_init(void) {
 	/* Port A */

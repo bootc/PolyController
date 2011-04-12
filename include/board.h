@@ -24,6 +24,7 @@
 #include <verify.h>
 
 #define BOARD_INFO_ADDR 0x010
+#define VERSION_INFO_ADDR 0x90
 
 struct board_info {
 	uint16_t crc;			// CRC-CCITT of info block
@@ -36,8 +37,18 @@ struct board_info {
 	uint8_t padding[10];	// Reserved for future use, set to 0xff
 };
 
+struct version_info {
+	uint8_t major;
+	uint8_t minor;
+	uint8_t patch;
+	char str[8];
+};
+
 // Compile-time check of struct size
 verify(sizeof(struct board_info) == 64);
+
+// Populated by linker
+extern struct version_info __version_info;
 
 // Call this to set up IO pins
 void board_init(void);

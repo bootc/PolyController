@@ -36,31 +36,56 @@ SHELL_COMMAND(info_command,
 INIT_SHELL_COMMAND(info_command);
 
 PROCESS_THREAD(shell_info_process, ev, data) {
+	struct version_info ldr_ver;
 	struct board_info bi;
 	struct uip_eth_addr mac;
 	struct stubboot_table stub;
 
 	PROCESS_BEGIN();
 
+	/*
+	 * Software Information section
+	 */
 	shell_output_P(&info_command,
 		PSTR("Software Information:\n"));
-	shell_output_P(&info_command,
-		PSTR("  Version: " CONFIG_VERSION "\n"));
-	shell_output_P(&info_command,
-		PSTR("  VCS Rev: %d\n"), VCS_REV);
 
+	// Current software version
+	shell_output_P(&info_command,
+		PSTR("  Version:   %S\n"),
+		__version_info.str);
+	shell_output_P(&info_command,
+		PSTR("  VCS Rev:   %d\n"), VCS_REV);
+
+	// Filesystem CRC
 	if (flashmgt_pfs) {
 		shell_output_P(&info_command,
-			PSTR("  FW CRC:  %08lx\n"),
+			PSTR("  FW CRC:    %08lx\n"),
 			flashmgt_pfs->sb.crc);
 	}
+	else {
+		shell_output_P(&info_command,
+			PSTR("  FW CRC:    NO FILESYSTEM!\n"));
+	}
+
+	// Bootloader version
+	uint_farptr_t ldr_ver_addr = CONFIG_BOOTLDR_START_ADDR + VERSION_INFO_ADDR;
+	for (int i = 0; i < sizeof(ldr_ver); i++) {
+		((uint8_t *)&ldr_ver)[i] = pgm_read_byte_far(ldr_ver_addr + i);
+	}
+	shell_output_P(&info_command,
+		PSTR("  Main Ldr:  %s\n"),
+		ldr_ver.str);
+
 	shell_output_P(&info_command,
 		PSTR("\n"));
 
+	/*
+	 * Hardware Information section
+	 */
 	shell_output_P(&info_command,
 		PSTR("Hardware Information:\n"));
 
-	// Read hardware info
+	// Read board info
 	board_info_read(&bi);
 
 	// Validate the info block
@@ -68,7 +93,7 @@ PROCESS_THREAD(shell_info_process, ev, data) {
 
 	if (ret) {
 		shell_output_P(&info_command,
-			PSTR("Hardware information block is not valid!\n"));
+			PSTR("  Hardware information block is not valid!\n"));
 	}
 	else {
 		shell_output_P(&info_command,
@@ -89,7 +114,7 @@ PROCESS_THREAD(shell_info_process, ev, data) {
 		mac.addr[0], mac.addr[1], mac.addr[2],
 		mac.addr[3], mac.addr[4], mac.addr[5]);
 
-	// Stub bootloader
+	// Stub bootloader version
 	stubboot_read_table(&stub);
 	shell_output_P(&info_command,
 		PSTR("  Stub Ldr:  %u.%d.%d\n"),
