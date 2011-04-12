@@ -31,9 +31,11 @@ F_CPU = 12000000
 #     be equal to F_CPU.
 F_CLOCK = $(F_CPU)
 
+ifneq ($(CONFIG_IMAGE),STUBBOOT)
 LDFLAGS += -T$(BOARD_DIR)/link.x
-
 $(curdir)-y += board.c
+endif
+
 $(curdir)-$(CONFIG_LIB_CONTIKI) += clock.c
 $(curdir)-$(CONFIG_LIB_CONTIKI) += main.c
 

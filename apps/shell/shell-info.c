@@ -23,6 +23,7 @@
 #include <board.h>
 #include <polyfs.h>
 #include <flashmgt.h>
+#include <stubboot.h>
 #include "shell.h"
 #include "apps/network.h"
 
@@ -37,6 +38,7 @@ INIT_SHELL_COMMAND(info_command);
 PROCESS_THREAD(shell_info_process, ev, data) {
 	struct board_info bi;
 	struct uip_eth_addr mac;
+	struct stubboot_table stub;
 
 	PROCESS_BEGIN();
 
@@ -86,6 +88,12 @@ PROCESS_THREAD(shell_info_process, ev, data) {
 		PSTR("  MAC Addr:  %02x:%02x:%02x:%02x:%02x:%02x\n"),
 		mac.addr[0], mac.addr[1], mac.addr[2],
 		mac.addr[3], mac.addr[4], mac.addr[5]);
+
+	// Stub bootloader
+	stubboot_read_table(&stub);
+	shell_output_P(&info_command,
+		PSTR("  Stub Ldr:  %u.%d.%d\n"),
+		stub.ver_major, stub.ver_minor, stub.ver_patch);
 
 	shell_output_P(&info_command,
 		PSTR("\n"));

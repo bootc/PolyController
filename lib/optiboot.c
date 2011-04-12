@@ -74,8 +74,7 @@
 #include <inttypes.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
-#include <avr/boot.h>
-#include <util/atomic.h>
+#include <stubboot.h>
 
 #include "drivers/uart.h"
 
@@ -172,53 +171,19 @@ void optiboot(void) {
 		/* Write memory, length is big endian and is in bytes  */
 		else if(ch == STK_PROG_PAGE) {
 			// PROGRAM PAGE - we support flash programming only, not EEPROM
-			uint8_t *bufPtr;
-#if (FLASHEND > USHRT_MAX)
-			uint32_t addrPtr;
-#else
-			uint16_t addrPtr;
-#endif
+			uint8_t *bufPtr = buff;
 
 			getLen();
 
-			// Immediately start page erase - this will 4.5ms
-			boot_page_erase(address);
-
-			// While that is going on, read in page contents
-			bufPtr = buff;
+			// Read in page contents
 			do *bufPtr++ = getch();
 			while (--length);
 
 			// Read command terminator, start reply
 			verifySpace();
 
-			// Disable interrupts
-			ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-				// If only a partial page is to be programmed, the erase might not be complete.
-				// So check that here
-				boot_spm_busy_wait();
-
-				// Copy buffer into programming buffer
-				bufPtr = buff;
-				addrPtr = address;
-				ch = SPM_PAGESIZE / 2;
-				do {
-					uint16_t a;
-					a = *bufPtr++;
-					a |= (*bufPtr++) << 8;
-					boot_page_fill(addrPtr, a);
-					addrPtr += 2;
-				} while (--ch);
-
-				// Write from programming buffer
-				boot_page_write(address);
-				boot_spm_busy_wait();
-
-#if defined(RWWSRE)
-				// Reenable read access to flash
-				boot_rww_enable();
-#endif
-			}
+			// Write the page
+			stubboot_write_page(address, buff);
 		}
 		/* Read memory block mode, length is big endian.  */
 		else if(ch == STK_READ_PAGE) {

@@ -34,8 +34,7 @@
 #endif
 
 #if CONFIG_IMAGE_BOOTLOADER
-#include <avr/boot.h>
-#include <avr/interrupt.h>
+#include <stubboot.h>
 #endif
 
 #include "drivers/dataflash.h"
@@ -466,40 +465,6 @@ out:
 #endif
 
 #if CONFIG_IMAGE_BOOTLOADER
-static uint8_t buf[CRC_BUFFER_SIZE];
-
-static void boot_program_page(uint32_t page, uint8_t *buf) {
-	uint16_t i;
-	uint8_t sreg;
-
-	// Disable interrupts.
-	sreg = SREG;
-	cli();
-
-	boot_page_erase_safe(page);
-	boot_spm_busy_wait();
-
-	for (i = 0; i < SPM_PAGESIZE; i += 2) {
-		// Set up little-endian word.
-
-		uint16_t w = *buf++;
-		w += (*buf++) << 8;
-
-		boot_page_fill(page + i, w);
-	}
-
-	// Store buffer in flash page.
-	boot_page_write_safe(page);
-	boot_spm_busy_wait();
-
-	// Reenable RWW-section again. We need this if we want to jump back
-	// to the application after bootloading.
-	boot_rww_enable ();
-
-	// Re-enable interrupts (if they were ever enabled).
-	SREG = sreg;
-}
-
 bool flashmgt_update_pending(void) {
 	// Read in the info
 	size_t size = sizeof(status);
@@ -516,6 +481,7 @@ int flashmgt_bootload(void) {
 	int ret;
 	polyfs_fs_t tempfs;
 	struct polyfs_inode sysimg;
+	static uint8_t buf[CRC_BUFFER_SIZE];
 
 	// Don't do anything unless an update is lined up
 	if (!status.update_pending) {
@@ -558,15 +524,12 @@ int flashmgt_bootload(void) {
 		}
 
 		// Write the page
-		boot_program_page(offset, buf);
+		stubboot_write_page(offset, buf);
 
 		// Advance the offset
 		offset += ret;
 	}
 	ret = 0;
-
-	// Re-enable the RWW section
-	boot_rww_enable();
 
 	// Swap the partitions around
 	status.primary = !status.primary;
