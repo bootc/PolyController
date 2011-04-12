@@ -1,7 +1,7 @@
 
 pfs: tools/polyfs $(TARGET).pfs
 
-%.bin: %.elf
+$(TARGET).bin: $(TARGET).elf
 	@echo
 	@echo $(MSG_FLASH) $@
 	$(OBJCOPY) -O binary -R .eeprom -R .fuse -R .lock $< $@

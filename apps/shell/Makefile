@@ -1,5 +1,6 @@
 
 $(curdir)-y += shell.c
+$(curdir)-$(CONFIG_APPS_SHELL_BOOTLDR_UPG) += shell-bootldr_upg.c
 $(curdir)-$(CONFIG_APPS_SHELL_DATE) += shell-date.c
 $(curdir)-$(CONFIG_APPS_SHELL_FILE) += shell-file.c
 $(curdir)-$(CONFIG_APPS_SHELL_FREE) += shell-free.c
