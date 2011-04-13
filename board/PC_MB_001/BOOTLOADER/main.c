@@ -54,6 +54,9 @@ void early_init(void)
 	__attribute__((section(".init3")));
 
 void early_init(void) {
+	// Make extra-certain interrupts are disabled
+	cli();
+
 	// Save MCUSR and clear it
 	mcusr_mirror = MCUSR;
 	MCUSR = 0;

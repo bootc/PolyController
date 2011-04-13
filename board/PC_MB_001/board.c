@@ -71,8 +71,63 @@ static struct version_info version_info
 	.str = CONFIG_VERSION,
 };
 
-// This gets called to set up the IO pins
+// This gets called to set up the board
 void board_init(void) {
+	/*
+	 * Disable all interrupt sources
+	 */
+	// External pin interrupts
+	EIMSK = 0;
+	EIFR = _BV(INTF2) | _BV(INTF1) | _BV(INTF0);
+	
+	// External pin change interrupts
+	PCICR = 0;
+	PCIFR = _BV(PCIF3) | _BV(PCIF2) | _BV(PCIF1) | _BV(PCIF0);
+	PCMSK3 = 0;
+	PCMSK2 = 0;
+	PCMSK1 = 0;
+	PCMSK0 = 0;
+
+	// Timer/Counter 0
+	TIMSK0 = 0;
+	TIFR0 = _BV(OCF0B) | _BV(OCF0A) | _BV(TOV0);
+
+	// Timer/Counter 1
+	TIMSK1 = 0;
+	TIFR1 = _BV(ICF1) | _BV(OCF1B) | _BV(OCF1A) | _BV(TOV1);
+
+	// Timer/Counter 2
+	TIMSK2 = 0;
+	TIFR2 = _BV(OCF2B) | _BV(OCF2A) | _BV(TOV2);
+
+	// SPI
+	SPCR &= ~(_BV(SPIE) | _BV(SPE));
+	if (SPSR & _BV(SPIF)) (void)SPDR;
+
+	// USART
+	UCSR0A |= _BV(TXC0);
+	UCSR0B = 0;
+	UCSR1A |= _BV(TXC1);
+	UCSR1B = 0;
+
+	// I2C
+	TWCR |= _BV(TWINT);
+	TWCR &= ~(_BV(TWEN) | _BV(TWIE));
+
+	// Analog Comparator
+	ACSR &= ~_BV(ACIE);
+	ACSR |= _BV(ACD) | _BV(ACI);
+
+	// ADC
+	ADCSRA &= ~(_BV(ADEN) | _BV(ADIE));
+	ADCSRA |= _BV(ADIF);
+
+	// SPM
+	SPMCSR &= ~_BV(SPMIE);
+
+	/*
+	 * Set up IO ports (default states)
+	 */
 	/* Port A */
 	DDRA = 0xff; // all outputs
 	PORTA = 0x00; // all pulled low
