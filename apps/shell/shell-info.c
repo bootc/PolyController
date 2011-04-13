@@ -60,7 +60,7 @@ PROCESS_THREAD(shell_info_process, ev, data) {
 	if (flashmgt_pfs) {
 		shell_output_P(&info_command,
 			PSTR("  FW CRC:    %08lx\n"),
-			flashmgt_pfs->sb.crc);
+			flashmgt_pfs->sb.fsid.crc);
 	}
 	else {
 		shell_output_P(&info_command,

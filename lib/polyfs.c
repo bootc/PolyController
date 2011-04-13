@@ -41,11 +41,15 @@
 #define PRINTF1(fmt) printf(fmt)
 #endif
 
+#if __BYTE_ORDER != __LITTLE_ENDIAN
+#error "This code assumes a little-endian architecture!"
+#endif
+
 // MIN for 32-bit uints
 static inline uint32_t min(uint32_t a, uint32_t b);
 
 // Read a raw buffer from underlying storage
-static int read_storage(polyfs_fs_t *fs, void *ptr,
+static inline int read_storage(polyfs_fs_t *fs, void *ptr,
 	uint32_t offset, uint16_t bytes);
 // Read a uint32_t from underlying storage and adjust byte order
 static inline int read_storage_uint32(polyfs_fs_t *fs,
@@ -89,7 +93,7 @@ int polyfs_fs_open(polyfs_fs_t *fs) {
 }
 
 int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
-	uint32_t crc = crc32(0, NULL, 0);
+	uint32_t crc = 0;
 	uint32_t size = 0;
 	uint32_t read_crc = 0;
 	uint32_t offset = 0;
@@ -107,12 +111,12 @@ int polyfs_check_crc(polyfs_fs_t *fs, void *temp, uint16_t tempsize) {
 
 		// If we've just read the superblock, extract some info
 		if (offset == 0) {
-			struct polyfs_super *super = (struct polyfs_super *)temp;
+			struct polyfs_super *super = temp;
 			size = POLYFS_32(super->size);
 			read_crc = POLYFS_32(super->fsid.crc);
 
 			// Wipe the CRC from the block we read so the calculation is valid
-			super->fsid.crc = POLYFS_32(crc32(0, NULL, 0));
+			super->fsid.crc = POLYFS_32(0);
 		}
 
 		offset += ret;
@@ -382,7 +386,7 @@ static inline uint32_t min(uint32_t a, uint32_t b) {
 	return (a < b) ? a : b;
 }
 
-static int read_storage(polyfs_fs_t *fs, void *ptr,
+static inline int read_storage(polyfs_fs_t *fs, void *ptr,
 	uint32_t offset, uint16_t bytes)
 {
 	if (fs->fn_read == NULL) {
@@ -447,9 +451,7 @@ static int read_super(polyfs_fs_t *fs) {
 	}
 
 	// Copy over a few more things
-	fs->sb.blocks = POLYFS_32(super.fsid.blocks);
-	fs->sb.files = POLYFS_32(super.fsid.files);
-	fs->sb.crc = POLYFS_32(super.fsid.crc);
+	memcpy(&fs->sb.fsid, &super.fsid, sizeof(super.fsid));
 
 	// Work out the root node's offset
 	root_offset = POLYFS_GET_OFFSET(&super.root) << 2;
@@ -479,7 +481,7 @@ static int read_super(polyfs_fs_t *fs) {
 	}
 
 	// Copy the root inode info over to the fs structure
-	fs->root = super.root;
+	memcpy(&fs->root, &super.root, sizeof(super.root));
 
 	return 0;
 }

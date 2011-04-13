@@ -30,11 +30,9 @@
  * polyfs super-block data in memory
  */
 struct polyfs_sb_info {
+	struct polyfs_info fsid;
 	uint32_t size;
-	uint32_t blocks;
-	uint32_t files;
 	uint32_t flags;
-	uint32_t crc;
 };
 
 #endif
