@@ -40,15 +40,6 @@
 #include "drivers/dataflash.h"
 #include "flashmgt.h"
 
-// memory buffer used during CRC check
-#define CRC_BUFFER_SIZE 256
-
-// We use the same buffer for SPM in the bootloader
-#if CRC_BUFFER_SIZE < SPM_PAGESIZE && CONFIG_IMAGE_BOOTLOADER
-#undef CRC_BUFFER_SIZE
-#define CRC_BUFFER_SIZE SPM_PAGESIZE
-#endif
-
 struct flashmgt_partition {
 	uint32_t start;
 	uint32_t end;
@@ -429,14 +420,14 @@ int flashmgt_sec_write_finish(void) {
 	}
 
 	// Malloc a buffer for the CRC check
-	crcbuf = malloc(CRC_BUFFER_SIZE);
+	crcbuf = malloc(SPM_PAGESIZE);
 	if (!crcbuf) {
 		ret = -1;
 		goto out;
 	}
 
 	// Check new filesystem CRC
-	ret = polyfs_check_crc(&tempfs, crcbuf, CRC_BUFFER_SIZE);
+	ret = polyfs_check_crc(&tempfs, crcbuf, SPM_PAGESIZE);
 	if (ret) {
 		goto out;
 	}
@@ -480,8 +471,8 @@ bool flashmgt_update_pending(void) {
 int flashmgt_bootload(void) {
 	int ret;
 	polyfs_fs_t tempfs;
-	struct polyfs_inode sysimg;
-	static uint8_t buf[CRC_BUFFER_SIZE];
+	uint32_t size;
+	static uint8_t buf[SPM_PAGESIZE];
 
 	// Don't do anything unless an update is lined up
 	if (!status.update_pending) {
@@ -491,43 +482,50 @@ int flashmgt_bootload(void) {
 	// Even if the update fails, we clear the pending flag
 	status.update_pending = 0;
 
-	// Open the new filesystem so we can check the CRC
+	// Open the new filesystem
 	ret = flashmgt_sec_open(&tempfs);
 	if (ret) {
 		goto out;
 	}
 
 	// Check new filesystem CRC
-	ret = polyfs_check_crc(&tempfs, buf, CRC_BUFFER_SIZE);
+	ret = polyfs_check_crc(&tempfs, buf, SPM_PAGESIZE);
 	if (ret) {
 		goto out;
 	}
 
-	// Look up the system image file
-	ret = polyfs_lookup(&tempfs, "/system.bin", &sysimg);
+	// Find the size of the firmware image
+	ret = polyfs_embed_info(&tempfs, &size);
 	if (ret) {
+		goto out;
+	}
+	else if (size == 0) {
+		ret = -1;
 		goto out;
 	}
 
 	// Loop through the entire file
-	uint32_t offset = 0;
-	while (offset < POLYFS_24(sysimg.size)) {
+	uint16_t pages = (size + (SPM_PAGESIZE - 1)) / SPM_PAGESIZE;
+	uint16_t page = 0;
+	while (page < pages) {
 		// Read a block from the file
-		ret = polyfs_fread(&tempfs, &sysimg, buf, offset,
-				CRC_BUFFER_SIZE);
+		ret = polyfs_embed_read(&tempfs, buf,
+				(uint32_t)page * SPM_PAGESIZE, SPM_PAGESIZE);
 		if (ret < 0) {
 			goto out;
 		}
-		else if (ret == 0) {
-			memset(&buf[ret], 0xff, CRC_BUFFER_SIZE - ret);
-			break;
+		// Pad the bytes at the end of the last page
+		else if (ret < SPM_PAGESIZE) {
+			memset(&buf[ret], 0xff, SPM_PAGESIZE - ret);
 		}
 
 		// Write the page
-		stubboot_write_page(offset, buf);
+		ret = stubboot_write_page(pages, buf);
+		if (ret < 0) {
+			goto out;
+		}
 
-		// Advance the offset
-		offset += ret;
+		page++;
 	}
 	ret = 0;
 
