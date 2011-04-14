@@ -7,10 +7,11 @@ $(TARGET).bin: $(TARGET).elf
 	$(OBJCOPY) -O binary -R .eeprom -R .fuse -R .lock $< $@
 
 # FIXME: more deps...
-%.pfs: $(BUILDDIR)/fsroot $(BUILDDIR)/fsroot/www/version.shtml
+%.pfs: $(BUILDDIR)/fsroot $(BUILDDIR)/fsroot/www/version.shtml $(TARGET).bin
 	@echo
 	@echo Creating firmware image: $@
 	$(MKPOLYFS) -v -E -n $(BOARD) -q -l \
+		-i $(TARGET).bin \
 		$(BUILDDIR)/fsroot $@
 	$(POLYFSCK) -v $@
 
@@ -21,7 +22,6 @@ $(BUILDDIR)/fsroot: $(IMAGE_DIR)/fsroot $(TARGET).bin
 		--exclude .*.swp \
 		--exclude .DS_Store --exclude ._* \
 		"$(IMAGE_DIR)/fsroot/" "$(BUILDDIR)/fsroot/"
-	cp $(TARGET).bin "$(BUILDDIR)"/fsroot/system.bin
 	touch "$(BUILDDIR)/fsroot"
 
 $(BUILDDIR)/fsroot/www/version.shtml: $(TARGET).bin $(BUILDDIR)/config.h
