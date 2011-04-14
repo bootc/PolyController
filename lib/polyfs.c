@@ -382,6 +382,55 @@ int polyfs_lookup(polyfs_fs_t *fs, const char *path,
 	return 0;
 }
 
+int polyfs_embed_info(polyfs_fs_t *fs, uint32_t *length) {
+	// Check if there is an embedded file first
+	if (!(fs->sb.flags & POLYFS_FLAG_SHIFTED_ROOT_OFFSET)) {
+		*length = 0;
+		return 0;
+	}
+
+	// Work out the root node's offset
+	*length = POLYFS_GET_OFFSET(&fs->root) << 2;
+
+	// Subtract size of superblock
+	*length -= sizeof(struct polyfs_super);
+
+	return 0;
+}
+
+int polyfs_embed_read(polyfs_fs_t *fs,
+	void *ptr, uint32_t offset, uint16_t bytes)
+{
+	int ret;
+	uint32_t size;
+
+	// Get the length of the embedded file
+	ret = polyfs_embed_info(fs, &size);
+	if (ret) {
+		return ret;
+	}
+
+	// Check we aren't trying to read past the end of the file
+	if (offset > size) {
+		return -1;
+	} 
+	// If the input buffer extends beyond the end of the file
+	else if (offset + bytes > size) {
+		// reduce the requested read size
+		bytes = size - offset;
+	}
+	// If we were asked to read nothing, we can return quickly
+	else if (bytes == 0) {
+		return 0;
+	}
+
+	// Real offset is just after the superblock
+	offset += sizeof(struct polyfs_super);
+
+	// Read from the storage
+	return read_storage(fs, ptr, offset, bytes);
+}
+
 static inline uint32_t min(uint32_t a, uint32_t b) {
 	return (a < b) ? a : b;
 }
@@ -413,7 +462,7 @@ static inline int read_storage_uint32(polyfs_fs_t *fs,
 static int read_super(polyfs_fs_t *fs) {
 	struct polyfs_super super;
 	int status;
-	uint16_t root_offset;
+	uint32_t root_offset;
 
 	// Read in the superblock
 	status = read_storage(fs, &super, 0, sizeof(super));

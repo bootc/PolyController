@@ -65,4 +65,11 @@ int polyfs_readdir(polyfs_readdir_t *rd);
 int polyfs_lookup(polyfs_fs_t *fs, const char *path,
 	struct polyfs_inode *inode);
 
+// Find the size of the 'embedded' file
+int polyfs_embed_info(polyfs_fs_t *fs, uint32_t *length);
+
+// Read the 'embedded' file
+int polyfs_embed_read(polyfs_fs_t *fs,
+	void *ptr, uint32_t offset, uint16_t bytes);
+
 #endif
