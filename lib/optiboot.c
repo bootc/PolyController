@@ -74,6 +74,7 @@
 #include <inttypes.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
+#include <string.h>
 #include <stubboot.h>
 
 #include "drivers/uart.h"
@@ -125,14 +126,9 @@ static inline void getNch(uint8_t);
 static void verifySpace(void);
 static inline uint8_t getLen(void);
 
-#if (FLASHEND > USHRT_MAX)
-uint32_t address;
-#else
-uint16_t address;
-#endif
-
+uint16_t page; // address as multiple of SPM_PAGESIZE
 uint8_t buff[SPM_PAGESIZE];
-uint8_t length;
+uint16_t length;
 
 /* main program starts here */
 void optiboot(void) {
@@ -142,6 +138,7 @@ void optiboot(void) {
 	for (;;) {
 		/* get character from UART */
 		ch = getch();
+		uint8_t reply = STK_OK;
 
 		if(ch == STK_GET_PARAMETER) {
 			// GET PARAMETER returns a generic 0x03 reply - enough to keep Avrdude happy
@@ -158,10 +155,18 @@ void optiboot(void) {
 		}
 		else if(ch == STK_LOAD_ADDRESS) {
 			// LOAD ADDRESS
-			address = getch();
+			uint16_t address = getch();
 			address = (address & 0xff) | (getch() << 8);
-			address += address; // Convert from word address to byte address
 			verifySpace();
+
+			// address is in words right now
+			if (address % (SPM_PAGESIZE / 2)) {
+				reply = STK_FAILED;
+			}
+			else {
+				// Convert to page address
+				page = address / (SPM_PAGESIZE / 2);
+			}
 		}
 		else if(ch == STK_UNIVERSAL) {
 			// UNIVERSAL command is ignored
@@ -170,10 +175,19 @@ void optiboot(void) {
 		}
 		/* Write memory, length is big endian and is in bytes  */
 		else if(ch == STK_PROG_PAGE) {
-			// PROGRAM PAGE - we support flash programming only, not EEPROM
+			// PROGRAM PAGE
 			uint8_t *bufPtr = buff;
 
-			getLen();
+			// we support flash programming only, not EEPROM
+			if ((getLen() == 'E') ||
+				(length > SPM_PAGESIZE) ||
+				(page >= (CONFIG_BOOTLDR_START_ADDR / SPM_PAGESIZE)))
+			{
+				reply = STK_FAILED;
+			}
+
+			// Clear the buffer
+			memset(buff, 0xff, sizeof(buff));
 
 			// Read in page contents
 			do *bufPtr++ = getch();
@@ -182,22 +196,33 @@ void optiboot(void) {
 			// Read command terminator, start reply
 			verifySpace();
 
-			// Write the page
-			stubboot_write_page(address, buff);
+			if (reply == STK_OK) {
+				// Write the page
+				stubboot_write_page(page, buff);
+			}
 		}
 		/* Read memory block mode, length is big endian.  */
 		else if(ch == STK_READ_PAGE) {
 			// READ PAGE - we only read flash
-			getLen();
+			if (getLen() == 'E') {
+				reply = STK_FAILED;
+			}
 			verifySpace();
-#if (FLASHEND > USHRT_MAX)
-			do putch(pgm_read_byte_far(address++));
-#else
-			do putch(pgm_read_byte_near(address++));
-#endif
-			while (--length);
-		}
 
+#if (FLASHEND > USHRT_MAX)
+			uint_farptr_t address = (uint_farptr_t)page * SPM_PAGESIZE;
+#else
+			uint16_t address = page * SPM_PAGESIZE;
+#endif
+
+			while (length--) {
+#if (FLASHEND > USHRT_MAX)
+				putch(pgm_read_byte_far(address++));
+#else
+				putch(pgm_read_byte_near(address++));
+#endif
+			}
+		}
 		/* Get device signature bytes  */
 		else if(ch == STK_READ_SIGN) {
 			// READ SIGN - return what Avrdude wants to hear
@@ -206,16 +231,12 @@ void optiboot(void) {
 			putch(SIGNATURE_1);
 			putch(SIGNATURE_2);
 		}
-		else if (ch == 'Q') {
-			verifySpace();
-			putch(STK_OK);
-			return;
-		}
 		else {
 			// This covers the response to commands like STK_ENTER_PROGMODE
 			verifySpace();
 		}
-		putch(STK_OK);
+
+		putch(reply);
 	}
 }
 
@@ -245,8 +266,8 @@ void verifySpace() {
 }
 
 uint8_t getLen() {
-	getch();
-	length = getch();
+	length = getch() << 8;
+	length |= getch();
 	return getch();
 }
 
