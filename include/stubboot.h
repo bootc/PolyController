@@ -35,63 +35,58 @@ struct stubboot_table {
 	uint8_t padding1;
 
 	/*
-	 * Writes a single flash page at byte address 'page'. 'addr' must point to
-	 * a location in RAM that is at least SPM_PAGESIZE bytes long.
+	 * Writes a single flash page at *page* address 'page'. 'addr' must point to
+	 * a location in RAM that is at least SPM_PAGESIZE bytes long. The page
+	 * address can be obtained by dividing the byte address by SPM_PAGESIZE.
 	 *
 	 * The entire buffer is written to flash. The flash page is erased prior to
 	 * writing.
 	 *
 	 * Interrupts and the watchdog must both be disabled before calling this
-	 * routine.
+	 * routine. They are forcefully disabled before the routine executes and not
+	 * restored before returning.
+	 *
+	 * Returns:
+	 *  -1 - on failure
+	 *   0 - on success
+	 *  <0 - on success after write retries (return is number of retries)
 	 */
-	void (* write_page)(uint_farptr_t page, const void *addr);
+	int8_t (* write_page)(uint16_t page, const void *addr);
 
 	/*
-	 * Updates the bootloader code in flash. 'info' is a pointer to a structure
-	 * defined below. The function returns 0 on success or non-zero on failure.
+	 * Updates the bootloader code in flash.
+	 *  'pages' - size of the bootloader code in increments of SPM_PAGESIZE.
+	 *  'crc'   - 16-bit CRC of the code calculated using _crc16_update() from
+	 *            util/crc16.h (initial value 0xffff).
+	 *  'addr'  - pointer to RAM memory buffer containing bootloader code.
+	 *
+	 * If the bootloader code is shorter than (pages * SPM_PAGESIZE) bytes, it
+	 * should be padded with 0xff. The entire buffer is considered when
+	 * calculating the CRC.
 	 *
 	 * The function cannot be called from the bootloader that is being updated
 	 * for obvious reasons - only call this from APPLICATION CODE! Written pages
-	 * are not CRC checked after being written.
+	 * are not CRC checked after being written, this must be done by the caller.
 	 *
 	 * Interrupts and the watchdog must both be disabled before calling this
-	 * routine.
+	 * routine. They are forcefully disabled before the routine executes and not
+	 * restored before returning.
+	 *
+	 * Returns:
+	 *  -1 - on failure
+	 *   0 - on success
+	 *  <0 - on success after write retries (return is number of retries)
 	 */
-	int (* update_loader)(const struct stubboot_selfupdate_info *info);
-};
-
-struct stubboot_selfupdate_info {
-	/*
-	 * Size of bootloader section to be written. This must be at least 512
-	 * bytes long (any sane bootloader is at least that big) and less than
-	 * 512 bytes less than the bootloader section size (7680 bytes on
-	 * PC-MB-001). It must also be a multiple of SPM_PAGESIZE. Unused bytes at
-	 * the end of the buffer should be set to 0xff.
-	 */
-	uint16_t size;
-
-	/*
-	 * CRC-16 of the bootloader data. This is checked within the update_loader()
-	 * function and the load is aborted if it does not match. This can be
-	 * computed using _crc16_update() from util/crc16.h with an initial value
-	 * of 0xffff.
-	 */
-	uint16_t crc;
-
-	/*
-	 * Pointer to a RAM buffer of at least 'size' bytes.
-	 */
-	void *addr;
+	int8_t (* update_loader)(uint8_t pages, uint16_t crc, void *addr);
 };
 
 // Compile-time check of struct size
 verify(sizeof(struct stubboot_table) == 8);
-verify(sizeof(struct stubboot_selfupdate_info) == 6);
 
 // Function to retrieve stubboot_table without memcpy_PF
 void stubboot_read_table(struct stubboot_table *t);
 
-int stubboot_write_page(uint_farptr_t page, const void *addr);
-int stubboot_update_loader(const struct stubboot_selfupdate_info *info);
+int stubboot_write_page(uint16_t page, const void *addr);
+int stubboot_update_loader(uint8_t pages, uint16_t crc, void *addr);
 
 #endif // STUBBOOT_H

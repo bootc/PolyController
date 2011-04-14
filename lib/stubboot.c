@@ -31,7 +31,9 @@ void stubboot_read_table(struct stubboot_table *t) {
 	}
 }
 
-int stubboot_write_page(uint_farptr_t page, const void *addr) {
+int stubboot_write_page(uint16_t page, const void *addr) {
+	int ret;
+
 	// Read the table if we haven't yet
 	if (!table.write_page) {
 		stubboot_read_table(&table);
@@ -47,14 +49,16 @@ int stubboot_write_page(uint_farptr_t page, const void *addr) {
 
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		// Call the function
-		table.write_page(page, addr);
+		ret = table.write_page(page, addr);
 	}
 
-	return 0;
+	return ret;
 }
 
 #if !CONFIG_IMAGE_BOOTLOADER
-int stubboot_update_loader(const struct stubboot_selfupdate_info *info) {
+int stubboot_update_loader(uint8_t pages, uint16_t crc, void *addr) {
+	int ret;
+
 	// Read the table if we haven't yet
 	if (!table.update_loader) {
 		stubboot_read_table(&table);
@@ -68,10 +72,9 @@ int stubboot_update_loader(const struct stubboot_selfupdate_info *info) {
 		return -1;
 	}
 
-	int ret;
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 		// Call the function
-		ret = table.update_loader(info);
+		ret = table.update_loader(pages, crc, addr);
 	}
 
 	return ret;
