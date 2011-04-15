@@ -41,7 +41,7 @@
 #include "apps/syslog.h"
 #endif
 
-const char sntp_server_name[] PROGMEM = "tarquin.bootc.net";
+const char sntp_server_name[] PROGMEM = "ntp.polycontroller.co.uk";
 
 PROCESS(timesync_process, "TimeSync");
 INIT_PROCESS(timesync_process);
