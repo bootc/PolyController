@@ -40,16 +40,13 @@ PT_THREAD(resolv_helper(struct resolv_helper_status *st,
 	// Send the query
 	resolv_query(st->name);
 
-	while (1) {
-		// Wait until we get a query resolved event
-		PT_WAIT_UNTIL(&st->pt, ev == resolv_event_found);
+	// Wait until we get a query resolved event for our hostname
+	PT_WAIT_UNTIL(&st->pt,
+		(ev == resolv_event_found) &&
+		(strncmp(data, st->name, sizeof(st->name)) == 0));
 
-		// Check the event has to do with our hostname
-		if (strncmp(data, st->name, sizeof(st->name)) == 0) {
-			ip = resolv_lookup(st->name);
-			break;
-		}
-	}
+	// Lookup the resolved address
+	ip = resolv_lookup(st->name);
 
 	// Check if the resolver managed to find an IP
 	if (ip) {
