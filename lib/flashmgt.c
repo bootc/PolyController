@@ -520,7 +520,7 @@ int flashmgt_bootload(void) {
 		}
 
 		// Write the page
-		ret = stubboot_write_page(pages, buf);
+		ret = stubboot_write_page(page, buf);
 		if (ret < 0) {
 			goto out;
 		}
