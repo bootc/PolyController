@@ -46,10 +46,10 @@ static struct stubboot_table table
 	.update_loader = update_loader,
 };
 
-static int8_t write_page(uint16_t pgin, const void *addr) {
+static int8_t write_page(uint16_t page, const void *buf1) {
 	uint8_t attempts = 0;
-	uint_farptr_t page = (uint_farptr_t)pgin * SPM_PAGESIZE;
-	const uint8_t *buf = addr;
+	uint_farptr_t addr = (uint_farptr_t)page * SPM_PAGESIZE;
+	const uint8_t *buf = buf1;
 
 	// Disable interrupts, disable watchdog
 	__asm__ __volatile__ (
@@ -63,12 +63,12 @@ static int8_t write_page(uint16_t pgin, const void *addr) {
 		);
 
 	// Must be a multiple of page size
-	if (pgin > (FLASHEND / SPM_PAGESIZE)) {
+	if (page > (FLASHEND / SPM_PAGESIZE)) {
 		return -1;
 	}
 
 	// Erase the page we're about to write to
-	boot_page_erase_safe(page);
+	boot_page_erase_safe(addr);
 	boot_spm_busy_wait();
 
 retry_write:
@@ -82,11 +82,11 @@ retry_write:
 		// Set up little-endian word.
 		uint16_t w = buf[i] | (buf[i + 1] << 8);
 
-		boot_page_fill(page + i, w);
+		boot_page_fill(addr + i, w);
 	}
 
 	// Store buffer in flash page.
-	boot_page_write(page);
+	boot_page_write(addr);
 	boot_spm_busy_wait();
 
 	// Reenable RWW-section again so we can read the data back.
@@ -94,7 +94,7 @@ retry_write:
 
 	// Verify the write
 	for (uint16_t i = 0; i < SPM_PAGESIZE; i++) {
-		if (pgm_read_byte_far(page + i) != buf[i]) {
+		if (pgm_read_byte_far(addr + i) != buf[i]) {
 			attempts++;
 			goto retry_write;
 		}
@@ -107,6 +107,7 @@ retry_write:
 static int8_t update_loader(uint8_t pages, uint16_t crc, void *addr) {
 	uint16_t i;
 	uint8_t ret = 0;
+	const uint8_t *buf = addr;
 
 	// Check the bootloader size isn't too big
 	if (pages > (LOADER_SIZE / SPM_PAGESIZE)) {
@@ -119,18 +120,17 @@ static int8_t update_loader(uint8_t pages, uint16_t crc, void *addr) {
 
 	// CRC check the data
 	uint16_t crc1 = 0xffff;
-	for (i = 0; i < (pages * SPM_PAGESIZE); i++) {
-		crc1 = _crc16_update(crc1, ((uint8_t *)addr)[i]);
+	for (i = 0; i < ((uint16_t)pages * SPM_PAGESIZE); i++) {
+		crc1 = _crc16_update(crc1, buf[i]);
 	}
 	if (crc1 != crc) {
 		return -1;
 	}
 
 	// Update the bootloader
-	const uint8_t *buf = addr;
+	uint16_t page = CONFIG_BOOTLDR_START_ADDR / SPM_PAGESIZE;
 	while (pages--) {
-		int ret1 = write_page(
-			(CONFIG_BOOTLDR_START_ADDR / SPM_PAGESIZE) + pages, buf);
+		int ret1 = write_page(page, buf);
 		if (ret1 < 0) {
 			return ret1;
 		}
@@ -138,6 +138,7 @@ static int8_t update_loader(uint8_t pages, uint16_t crc, void *addr) {
 			ret += ret1;
 		}
 
+		page++;
 		buf += SPM_PAGESIZE;
 	}
 
