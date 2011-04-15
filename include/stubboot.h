@@ -49,7 +49,7 @@ struct stubboot_table {
 	 * Returns:
 	 *  -1 - on failure
 	 *   0 - on success
-	 *  <0 - on success after write retries (return is number of retries)
+	 *  >0 - on success after write retries (return is number of retries)
 	 */
 	int8_t (* write_page)(uint16_t page, const void *addr);
 
@@ -75,7 +75,7 @@ struct stubboot_table {
 	 * Returns:
 	 *  -1 - on failure
 	 *   0 - on success
-	 *  <0 - on success after write retries (return is number of retries)
+	 *  >0 - on success after write retries (return is number of retries)
 	 */
 	int8_t (* update_loader)(uint8_t pages, uint16_t crc, void *addr);
 };
