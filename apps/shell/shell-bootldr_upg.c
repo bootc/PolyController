@@ -43,11 +43,12 @@ PROCESS_THREAD(shell_bootldr_upg_process, ev, data) {
 	struct polyfs_inode inode;
 	int ret;
 	uint16_t filesz;
+	uint8_t pages;
 	uint16_t bufsz;
 	uint8_t *buf;
 	uint16_t offset;
-	struct stubboot_selfupdate_info upd;
 	struct version_info *ver;
+	uint16_t crc = 0xffff;
 
 	PROCESS_BEGIN();
 
@@ -60,7 +61,8 @@ PROCESS_THREAD(shell_bootldr_upg_process, ev, data) {
 	}
 
 	filesz = POLYFS_24(inode.size);
-	bufsz = ((filesz + (SPM_PAGESIZE - 1)) / SPM_PAGESIZE) * SPM_PAGESIZE;
+	pages = (filesz + (SPM_PAGESIZE - 1)) / SPM_PAGESIZE;
+	bufsz = pages * SPM_PAGESIZE;
 
 	// Allocate a buffer large enough for the file
 	buf = malloc(bufsz);
@@ -95,32 +97,34 @@ PROCESS_THREAD(shell_bootldr_upg_process, ev, data) {
 		PSTR("New bootloader version: %s\n"),
 		ver->str);
 
-	upd.size = bufsz;
-	upd.crc = 0xffff;
-	upd.addr = buf;
 
 	// Work out the CRC
 	for (offset = 0; offset < bufsz; offset++) {
-		upd.crc = _crc16_update(upd.crc, buf[offset]);
+		crc = _crc16_update(crc, buf[offset]);
 	}
 
-	ret = stubboot_update_loader(&upd);
-	if (ret) {
+	ret = stubboot_update_loader(pages, crc, buf);
+	if (ret < 0) {
 		shell_output_P(&bootldr_upg_command,
 			PSTR("Upgrade failed: %d\n"),
 			ret);
 		free(buf);
 		PROCESS_EXIT();
 	}
-
-	// Check the CRC
-	uint16_t crc = 0xffff;
-	for (offset = 0; offset < bufsz; offset++) {
-		uint_farptr_t addr = CONFIG_BOOTLDR_START_ADDR + offset;
-		crc = _crc16_update(crc, pgm_read_byte_far(addr));
+	else if (ret > 0) {
+		shell_output_P(&bootldr_upg_command,
+			PSTR("Upgrade successful after %d retried writes.\n"),
+			ret);
 	}
 
-	if (crc == upd.crc) {
+	// Check the CRC
+	uint16_t crc1 = 0xffff;
+	for (offset = 0; offset < bufsz; offset++) {
+		uint_farptr_t addr = CONFIG_BOOTLDR_START_ADDR + offset;
+		crc1 = _crc16_update(crc1, pgm_read_byte_far(addr));
+	}
+
+	if (crc1 == crc) {
 		shell_output_P(&bootldr_upg_command,
 			PSTR("Upgrade successful!\n"));
 	}
