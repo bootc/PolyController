@@ -24,7 +24,9 @@
 #include <stdlib.h>
 #include "shell.h"
 #include "drivers/wallclock.h"
+#if CONFIG_APPS_TIMESYNC
 #include "apps/timesync.h"
+#endif
 
 #include <time.h>
 #include <avr/pgmspace.h>
@@ -56,6 +58,7 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 
 		free(date);
 	}
+#if CONFIG_APPS_TIMESYNC
 	else if (strcmp_P(data, PSTR("--sync")) == 0) {
 		if (timesync_status.running) {
 			timesync_schedule_resync();
@@ -68,6 +71,7 @@ PROCESS_THREAD(shell_date_process, ev, data) {
 				PSTR("TimeSync not running.\n"));
 		}
 	}
+#endif
 	else if (strcmp_P(data, PSTR("--frac")) == 0) {
 		wallclock_time_t time;
 		wallclock_get(&time);
