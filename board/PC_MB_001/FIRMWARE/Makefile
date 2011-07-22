@@ -1,4 +1,7 @@
 
+# Heap ends and stack starts 2K from RAMEND
+CFLAGS += -Wl,--defsym=__heap_end=0x8038ff
+
 pfs: tools/polyfs $(TARGET).pfs
 
 $(TARGET).bin: $(TARGET).elf

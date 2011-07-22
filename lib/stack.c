@@ -19,6 +19,7 @@
  */
 
 #include <avr/io.h>
+#include <stdlib.h>
 #include "stack.h"
 
 #define MAX(a, b) ((a) > (b)? (a): (b))
@@ -57,7 +58,7 @@ void StackPaint(void) {
 
 #define STACK_CANARY 0xc5
 uint16_t StackCount(void) {
-	const uint8_t *p = MAX(&_end, (uint8_t *)__brkval);
+	const uint8_t *p = MAX((uint8_t *)__malloc_heap_end, (uint8_t *)__brkval);
 	uint16_t c = 0;
 
 	while(*p == STACK_CANARY && p <= &__stack) {
