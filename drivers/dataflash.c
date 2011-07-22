@@ -27,6 +27,8 @@
 #include "dataflash.h"
 #include "spi.h"
 
+#include <compat.h>
+
 #define CMD_RD_ARRAY 0x0b
 #define CMD_RD_ARRAY_LF 0x03
 #define CMD_ERASE_BLK_4K 0x20
@@ -205,7 +207,7 @@ int dataflash_sector_by_idx(uint8_t idx, dataflash_sector_t *sector) {
 	addr += idx * sizeof(dataflash_sector_t);
 
 	// Copy the entry over
-	memcpy_PF(sector, addr, sizeof(*sector));
+	poly_memcpy_PF(sector, addr, sizeof(*sector));
 #else
 	// Copy the entry over
 	memcpy_P(sector, &sectors[idx], sizeof(*sector));

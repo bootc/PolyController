@@ -29,6 +29,8 @@
 #include <stdio.h>
 #endif
 
+#include <compat.h>
+
 // Linker symbols
 extern struct init_entry *__init_drivers_start;
 extern struct init_entry *__init_drivers_end;
@@ -44,7 +46,7 @@ extern struct init_entry *__init_components_end;
 static void init_call_funcs(uint_farptr_t start, uint_farptr_t end) {
 	while (start < end) {
 		struct init_entry ent;
-		memcpy_PF(&ent, start, sizeof(ent));
+		poly_memcpy_PF(&ent, start, sizeof(ent));
 
 #if CONFIG_IMAGE_BOOTLOADER
 		ent.fn();
