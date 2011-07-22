@@ -52,34 +52,6 @@
 // size of dataflash in bytes
 #define FLASH_SIZE 1048576
 
-#if __AVR_LIBC_VERSION__ < 10700UL && CONFIG_IMAGE_BOOTLOADER
-static inline void *memcpy_PF(void *dest, uint_farptr_t src, size_t len) {
-	uint8_t *ptr = dest;
-	while (len--) {
-		*ptr++ = pgm_read_byte_far(src++);
-	}
-	return dest;
-}
-
-#define pgm_get_far_address(var)                          \
-({                                                    \
-	uint_farptr_t tmp;                                \
-                                                      \
-	__asm__ __volatile__(                             \
-                                                      \
-			"ldi	%A0, lo8(%1)"           "\n\t"    \
-			"ldi	%B0, hi8(%1)"           "\n\t"    \
-			"ldi	%C0, hh8(%1)"           "\n\t"    \
-			"clr	%D0"                    "\n\t"    \
-		:                                             \
-			"=d" (tmp)                                \
-		:                                             \
-			"p"  (&(var))                             \
-	);                                                \
-	tmp;                                              \
-})
-#endif
-
 static const dataflash_sector_t sectors[] PROGMEM = {
 	{ 0x00000, 0x0ffff }, //  0: 64K
 	{ 0x10000, 0x1ffff }, //  1: 64K

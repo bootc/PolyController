@@ -41,39 +41,6 @@ extern struct process *__init_processes_end;
 extern struct init_entry *__init_components_start;
 extern struct init_entry *__init_components_end;
 
-#if __AVR_LIBC_VERSION__ < 10700UL
-#if __AVR_HAVE_ELPM__
-static inline void *memcpy_PF(void *dest, uint_farptr_t src, size_t len) {
-	uint8_t *ptr = dest;
-	while (len--) {
-		*ptr++ = pgm_read_byte_far(src++);
-	}
-	return dest;
-}
-
-#define pgm_get_far_address(var)                          \
-({                                                    \
-	uint_farptr_t tmp;                                \
-                                                      \
-	__asm__ __volatile__(                             \
-                                                      \
-			"ldi	%A0, lo8(%1)"           "\n\t"    \
-			"ldi	%B0, hi8(%1)"           "\n\t"    \
-			"ldi	%C0, hh8(%1)"           "\n\t"    \
-			"clr	%D0"                    "\n\t"    \
-		:                                             \
-			"=d" (tmp)                                \
-		:                                             \
-			"p"  (&(var))                             \
-	);                                                \
-	tmp;                                              \
-})
-#else
-#define memcpy_PF(a, b, c) memcpy_P(a, (void *)(uint16_t)b, c)
-#define pgm_get_far_address(var) ((uint_farptr_t)(uint16_t)&var)
-#endif
-#endif
-
 static void init_call_funcs(uint_farptr_t start, uint_farptr_t end) {
 	while (start < end) {
 		struct init_entry ent;
