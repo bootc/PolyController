@@ -182,6 +182,7 @@ CFLAGS += -Wstrict-aliasing
 #CFLAGS += -Wundef
 #CFLAGS += -Wunreachable-code
 #CFLAGS += -Wsign-compare
+CFLAGS += -Wframe-larger-than=128
 CFLAGS += -Wa,-adhlns=$(<:%.c=$(OBJDIR)/%.lst)
 CFLAGS += -include $(BUILDDIR)/config.h
 CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))

@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #if CONFIG_LIB_LZO
 #include <minilzo/minilzo.h>
@@ -304,15 +305,21 @@ int polyfs_readdir(polyfs_readdir_t *rd) {
 int polyfs_lookup(polyfs_fs_t *fs, const char *path,
 	struct polyfs_inode *inode)
 {
-	polyfs_readdir_t rd;
+	int err;
+	polyfs_readdir_t *rd;
 	int pathlen = strlen(path);
+
+	// Allocate the readdir struct
+	rd = malloc(sizeof(*rd));
+	if (!rd) {
+		return -1;
+	}
 
 	// Start at the root inode
 	*inode = fs->root;
 
 	// Main traversal loop
 	while (pathlen) {
-		int err;
 		char *term;
 		int len;
 		int found = 0;
@@ -333,24 +340,24 @@ int polyfs_lookup(polyfs_fs_t *fs, const char *path,
 		}
 
 		// Start the readdir
-		err = polyfs_opendir(fs, inode, &rd);
-		if (err) return err;
+		err = polyfs_opendir(fs, inode, rd);
+		if (err) goto out;
 
 		// Iterate through the entries
-		while (rd.next) {
+		while (rd->next) {
 			int cmp;
 			int namelen;
 
 			// Read the directory entry
-			err = polyfs_readdir(&rd);
-			if (err) return err;
+			err = polyfs_readdir(rd);
+			if (err) goto out;
 
 			// Find the length of the name string
-			namelen = strnlen((char *)rd.name,
-				POLYFS_GET_NAMELEN(&rd.inode) << 2);
+			namelen = strnlen((char *)rd->name,
+				POLYFS_GET_NAMELEN(&rd->inode) << 2);
 
 			// Compare the names
-			cmp = strncmp((char *)rd.name, path, min(len, namelen));
+			cmp = strncmp((char *)rd->name, path, min(len, namelen));
 
 			if (cmp > 0) {
 				// Doesn't match and it sorts greater than path
@@ -369,17 +376,22 @@ int polyfs_lookup(polyfs_fs_t *fs, const char *path,
 
 		// We haven't found the subdirectory
 		if (!found) {
-			return -1;
+			err = -1;
+			goto out;
 		}
 
 		// Advance to the next path element
-		*inode = rd.inode;
+		*inode = rd->inode;
 		path += len;
 		pathlen -= len;
 	}
 
 	// Looks like we found it!
-	return 0;
+	err = 0;
+
+out:
+	free(rd);
+	return err;
 }
 
 int polyfs_embed_info(polyfs_fs_t *fs, uint32_t *length) {

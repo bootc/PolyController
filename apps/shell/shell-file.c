@@ -45,6 +45,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "shell.h"
 
@@ -83,12 +84,21 @@ static void print_inode(const char *name, const struct polyfs_inode *ino) {
 		name);
 }
 
-PROCESS_THREAD(shell_ls_process, ev, data) {
-	int err;
+struct shell_ls_process_data {
 	struct polyfs_inode dir;
 	polyfs_readdir_t rd;
 	char name[POLYFS_MAXPATHLEN + 1];
+};
+
+PROCESS_THREAD(shell_ls_process, ev, data) {
+	int err;
+	static struct shell_ls_process_data *d = NULL;
+	PROCESS_EXITHANDLER(if (d) { free(d); d = NULL; });
 	PROCESS_BEGIN();
+
+	if (d == NULL) {
+		d = malloc(sizeof(*d));
+	}
 
 	// List root directory if no path provided
 	if (!data || strlen(data) == 0) {
@@ -96,7 +106,7 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 	}
 
 	// Lookup directory
-	err = polyfs_lookup(polyfs_cfs_fs, data, &dir);
+	err = polyfs_lookup(polyfs_cfs_fs, data, &d->dir);
 	if (err < 0) {
 		shell_output_P(&ls_command,
 			PSTR("Cannot lookup path: %s\n"), data);
@@ -104,9 +114,9 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 	}
 
 	// Print the contents of a directory
-	if (S_ISDIR(dir.mode)) {
+	if (S_ISDIR(d->dir.mode)) {
 		// Open the directory for reading
-		err = polyfs_opendir(polyfs_cfs_fs, &dir, &rd);
+		err = polyfs_opendir(polyfs_cfs_fs, &d->dir, &d->rd);
 		if (err < 0) {
 			shell_output_P(&ls_command,
 				PSTR("Cannot read directory\n"));
@@ -114,9 +124,9 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 		}
 
 		// Loop through reading all files
-		while (rd.next) {
+		while (d->rd.next) {
 			// Read the directory entry
-			err = polyfs_readdir(&rd);
+			err = polyfs_readdir(&d->rd);
 			if (err < 0) {
 				shell_output_P(&ls_command,
 					PSTR("Readdir failed\n"));
@@ -124,23 +134,23 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 			}
 
 			// Copy the file name out as a null-terminated string
-			name[0] = '\0';
-			strncat(name, (char *)rd.name, POLYFS_GET_NAMELEN(&rd.inode) << 2);
+			d->name[0] = '\0';
+			strncat(d->name, (char *)d->rd.name, POLYFS_GET_NAMELEN(&d->rd.inode) << 2);
 
 			// Print the inode
-			print_inode(name, &rd.inode);
+			print_inode(d->name, &d->rd.inode);
 		}
 	}
 	// Not a directory: just show the one entry
 	else {
-		print_inode(data, &dir);
+		print_inode(data, &d->dir);
 	}
 
 	PROCESS_END();
 }
 
 PROCESS_THREAD(shell_cat_process, ev, data) {
-	static int fd = 0;
+	static int fd;
 	PROCESS_EXITHANDLER(cfs_close(fd));
 	PROCESS_BEGIN();
 
