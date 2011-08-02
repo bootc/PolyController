@@ -146,6 +146,10 @@ PROCESS_THREAD(shell_ls_process, ev, data) {
 		print_inode(data, &d->dir);
 	}
 
+	// Clean up
+	free(d);
+	d = NULL;
+
 	PROCESS_END();
 }
 
