@@ -31,8 +31,8 @@
 // Number of write attempts
 #define WRITE_ATTEMPTS 3
 
-static int8_t write_page(uint16_t page, const void *addr);
-static int8_t update_loader(uint8_t pages, uint16_t crc, void *addr);
+static int8_t api_write_page(uint16_t page, const void *addr);
+static int8_t api_update_loader(uint8_t pages, uint16_t crc, void *addr);
 
 static struct stubboot_table table
 	__attribute__((used))
@@ -42,8 +42,8 @@ static struct stubboot_table table
 	.ver_minor = CONFIG_VERSION_MINOR,
 	.ver_patch = CONFIG_VERSION_PATCH,
 
-	.write_page = write_page,
-	.update_loader = update_loader,
+	.write_page = api_write_page,
+	.update_loader = api_update_loader,
 };
 
 static int8_t write_page(uint16_t page, const void *buf1) {
@@ -51,24 +51,12 @@ static int8_t write_page(uint16_t page, const void *buf1) {
 	uint_farptr_t addr = (uint_farptr_t)page * SPM_PAGESIZE;
 	const uint8_t *buf = buf1;
 
-	// Disable interrupts, disable watchdog
-	__asm__ __volatile__ (
-		"cli" "\n\t"
-		"sts %0, %1" "\n\t"
-		"sts %0, __zero_reg__" "\n\t"
-		: /* no outputs */
-		: "M" (_SFR_MEM_ADDR(_WD_CONTROL_REG)),
-		"r" ((uint8_t)(_BV(_WD_CHANGE_BIT) | _BV(WDE)))
-		: "r0"
-		);
-
-	// Must be a multiple of page size
-	if (page > (FLASHEND / SPM_PAGESIZE)) {
-		return -1;
-	}
+	// Make sure no SPM or EEPROM operations are taking place
+	boot_spm_busy_wait();
+	eeprom_busy_wait();
 
 	// Erase the page we're about to write to
-	boot_page_erase_safe(addr);
+	boot_page_erase(addr);
 	boot_spm_busy_wait();
 
 retry_write:
@@ -104,10 +92,52 @@ retry_write:
 	return attempts;
 }
 
-static int8_t update_loader(uint8_t pages, uint16_t crc, void *addr) {
+static int8_t api_write_page(uint16_t page, const void *buf) {
+	// Check that we're being run from the bootloader section (interrupts moved)
+	if (!(MCUCR & _BV(IVSEL))) {
+		return -1;
+	}
+
+	// Disable interrupts, disable watchdog
+	__asm__ __volatile__ (
+		"cli" "\n\t"
+		"sts %0, %1" "\n\t"
+		"sts %0, __zero_reg__" "\n\t"
+		: /* no outputs */
+		: "M" (_SFR_MEM_ADDR(_WD_CONTROL_REG)),
+		"r" ((uint8_t)(_BV(_WD_CHANGE_BIT) | _BV(WDE)))
+		: "r0"
+		);
+
+	// Don't allow the write_page API function to touch the bootloader
+	if (page >= (CONFIG_BOOTLDR_START_ADDR / SPM_PAGESIZE)) {
+		return -1;
+	}
+
+	return write_page(page, buf);
+}
+
+static int8_t api_update_loader(uint8_t pages, uint16_t crc, void *addr) {
 	uint16_t i;
 	uint8_t ret = 0;
 	const uint8_t *buf = addr;
+
+	// Check that we're NOT being run from the bootloader section
+	// (interrupts moved)
+	if (MCUCR & _BV(IVSEL)) {
+		return -1;
+	}
+
+	// Disable interrupts, disable watchdog
+	__asm__ __volatile__ (
+		"cli" "\n\t"
+		"sts %0, %1" "\n\t"
+		"sts %0, __zero_reg__" "\n\t"
+		: /* no outputs */
+		: "M" (_SFR_MEM_ADDR(_WD_CONTROL_REG)),
+		"r" ((uint8_t)(_BV(_WD_CHANGE_BIT) | _BV(WDE)))
+		: "r0"
+		);
 
 	// Check the bootloader size isn't too big
 	if (pages > (LOADER_SIZE / SPM_PAGESIZE)) {
