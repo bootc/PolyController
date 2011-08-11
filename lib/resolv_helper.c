@@ -23,6 +23,7 @@
 #include <stdio.h>
 
 #include "resolv_helper.h"
+#include "pton.h"
 
 #include "apps/network.h"
 
@@ -34,6 +35,17 @@ PT_THREAD(resolv_helper(struct resolv_helper_status *st,
 	uip_ipaddr_t *ip = NULL;
 
 	PT_BEGIN(&st->pt);
+
+	// Check if the string is in fact an IP address
+	if (inet_pton(st->name, &st->ipaddr)) {
+		// All done
+		st->state = RESOLV_HELPER_STATE_DONE;
+
+		// IPs never "expire"
+		while (1) {
+			PT_YIELD(&st->pt);
+		}
+	}
 
 	PT_WAIT_UNTIL(&st->pt, net_status.configured);
 
