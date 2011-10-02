@@ -21,9 +21,8 @@ $(TARGET).bin: $(TARGET).elf
 $(BUILDDIR)/fsroot: $(IMAGE_DIR)/fsroot $(TARGET).bin
 	$(REMOVEDIR) "$(BUILDDIR)/fsroot"
 	rsync -a \
-		--exclude .svn \
-		--exclude .*.swp \
-		--exclude .DS_Store --exclude ._* \
+		--exclude ".*.swp" \
+		--exclude .DS_Store --exclude "._*" \
 		"$(IMAGE_DIR)/fsroot/" "$(BUILDDIR)/fsroot/"
 	touch "$(BUILDDIR)/fsroot"
 
@@ -34,14 +33,14 @@ $(BUILDDIR)/fsroot/www/version.shtml: $(TARGET).bin $(BUILDDIR)/config.h
 	@echo "Version Number: $(CONFIG_VERSION)" >> $@
 	@echo -n "Build Date: " >> $@
 	@date -r $(TARGET).bin >> $@
-	@svn info . | grep Revision >> $@
+	@echo "GIT Revision: $(VCS_REVISION)" >> $@
 	@echo >> $@
 	@echo "Changed files:" >> $@
-	@svn status -q >> $@
+	@git status --porcelain >> $@
 	@echo "</pre>" >> $@
 	@echo "%!:/foot.html" >> $@
 
-FSFILES := $(shell find $(IMAGE_DIR)/fsroot -mindepth 1 -name .svn -prune -o -print)
+FSFILES := $(shell find $(IMAGE_DIR)/fsroot -mindepth 1 -print)
 $(IMAGE_DIR)/fsroot: $(FSFILES)
 	touch $(IMAGE_DIR)/fsroot
 

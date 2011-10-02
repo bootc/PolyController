@@ -54,7 +54,7 @@ PROCESS_THREAD(shell_info_process, ev, data) {
 		PSTR("  Version:   %S\n"),
 		__version_info.str);
 	shell_output_P(&info_command,
-		PSTR("  VCS Rev:   %d\n"), VCS_REV);
+		PSTR("  VCS Rev:   " VCS_REV "\n"));
 
 	// Filesystem CRC
 	if (flashmgt_pfs) {

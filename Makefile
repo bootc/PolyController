@@ -76,7 +76,7 @@ TARGET = $(BOARD)-$(IMAGE)
 
 
 # VCS information
-VCS_REVISION = $(shell svn info | grep '^Revision:' | awk '{ print $$2 }')
+VCS_REVISION = $(shell git describe --always)
 
 
 # Object files directory
@@ -135,7 +135,7 @@ CPPSTANDARD = -std=gnu++0x
 # Place -D or -U options here for C sources
 CDEFS  = -DF_CPU=$(F_CPU)UL
 CDEFS += -DF_CLOCK=$(F_CLOCK)UL
-CDEFS += -DVCS_REV=$(VCS_REVISION)
+CDEFS += -DVCS_REV=\"$(VCS_REVISION)\"
 
 
 # Place -D or -U options here for ASM sources
@@ -146,7 +146,7 @@ ADEFS += -DF_CLOCK=$(F_CLOCK)UL
 # Place -D or -U options here for C++ sources
 CPPDEFS  = -DF_CPU=$(F_CPU)UL
 CPPDEFS += -DF_CLOCK=$(F_CLOCK)UL
-CPPDEFS += -DVCS_REV=$(VCS_REVISION)
+CPPDEFS += -DVCS_REV=\"$(VCS_REVISION)\"
 #CPPDEFS += -D__STDC_LIMIT_MACROS
 #CPPDEFS += -D__STDC_CONSTANT_MACROS
 
