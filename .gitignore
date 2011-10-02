@@ -1,0 +1,12 @@
+*.bin
+*.eep
+*.elf
+*.hex
+*.lss
+*.map
+*.pfs
+*.sym
+.dep
+build
+tools/polyfs/mkpolyfs
+tools/polyfs/polyfsck
