@@ -1,14 +1,9 @@
 
-CONTIKI_CVSROOT=":pserver:anonymous@contiki.cvs.sourceforge.net:/cvsroot/contiki"
-CONTIKI_CVSREV="HEAD"
-CONTIKI_CVSOPTS=-z3 -d $(CONTIKI_CVSROOT) export -r $(CONTIKI_CVSREV)
-CONTIKI_CVSMODULE=contiki-2.x
-
 # Contiki OS files
-CONTIKI := contiki
+CONTIKI := contiki-os
 CONTIKI_INC := \
-	$(BUILDDIR)/$(CONTIKI)/core/ \
-	$(BUILDDIR)/$(CONTIKI)/cpu/avr/
+	$(curdir)/$(CONTIKI)/core/ \
+	$(curdir)/$(CONTIKI)/cpu/avr/
 CONTIKI_SYSTEM := \
 	process.c procinit.c autostart.c \
 	timetable.c timetable-aggregate.c compower.c mt.c \
@@ -46,27 +41,15 @@ CONTIKI_NET += \
 endif # CONFIG_LIB_CONTIKI_IPV6
 
 CONTIKI_SRC := \
-	${addprefix $(BUILDDIR)/$(CONTIKI)/core/sys/,$(CONTIKI_SYSTEM)} \
-	${addprefix $(BUILDDIR)/$(CONTIKI)/core/lib/,$(CONTIKI_LIBS)} \
-	${addprefix $(BUILDDIR)/$(CONTIKI)/core/net/,$(CONTIKI_NET)} \
-	${addprefix $(BUILDDIR)/$(CONTIKI)/cpu/avr/,$(CONTIKI_AVR)} \
-	${addprefix $(BUILDDIR)/$(CONTIKI)/core/dev/,$(CONTIKI_DEV)}
-
+	${addprefix $(curdir)/$(CONTIKI)/core/sys/,$(CONTIKI_SYSTEM)} \
+	${addprefix $(curdir)/$(CONTIKI)/core/lib/,$(CONTIKI_LIBS)} \
+	${addprefix $(curdir)/$(CONTIKI)/core/net/,$(CONTIKI_NET)} \
+	${addprefix $(curdir)/$(CONTIKI)/cpu/avr/,$(CONTIKI_AVR)} \
+	${addprefix $(curdir)/$(CONTIKI)/core/dev/,$(CONTIKI_DEV)}
 
 LIB_CONTIKI_DIR := $(curdir)
 EXTRAINCDIRS += $(CONTIKI_INC)
 SRC += $(CONTIKI_SRC)
-
-# make all source depend on contiki
-$(SRC): $(BUILDDIR)/$(CONTIKI)
-
-$(BUILDDIR)/$(CONTIKI):
-	$(REMOVEDIR) "$(BUILDDIR)/$(CONTIKI_CVSMODULE)"
-	cd $(BUILDDIR) && cvs $(CONTIKI_CVSOPTS) $(CONTIKI_CVSMODULE)
-	for F in `cat $(LIB_CONTIKI_DIR)/patches/series`; do \
-		cat "$(LIB_CONTIKI_DIR)/patches/$$F" | (cd "$(BUILDDIR)/$(CONTIKI_CVSMODULE)" && patch -p0 || exit 1); \
-	done
-	mv "$(BUILDDIR)/$(CONTIKI_CVSMODULE)" "$(BUILDDIR)/$(CONTIKI)"
 
 $(eval $(call subdir,$(curdir)))
 

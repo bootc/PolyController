@@ -1,0 +1,3 @@
+[submodule "lib/contiki/contiki-os"]
+	path = lib/contiki/contiki-os
+	url = git://github.com/bootc/Contiki.git
