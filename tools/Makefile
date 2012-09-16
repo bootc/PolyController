@@ -8,7 +8,7 @@ $(MKPOLYFS): $(curdir)/polyfs
 $(POLYFSCK): $(curdir)/polyfsck
 
 $(curdir)/polyfs:
-	$(MAKE) -C $(curdir)/polyfs/
+	@$(MAKE) -C $(curdir)/polyfs/
 
 $(curdir)/polyfs_clean:
 	$(MAKE) -C $(curdir)/polyfs/ clean

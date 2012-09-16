@@ -1,30 +1,31 @@
 
+MSG_BINARY = " [BIN]  "
+MSG_PFS = " [PFS]  "
+
 # Heap ends and stack starts 2K from RAMEND
 CFLAGS += -Wl,--defsym=__heap_end=0x8038ff
 
 pfs: tools/polyfs $(TARGET).pfs
 
 $(TARGET).bin: $(TARGET).elf
-	@echo
-	@echo $(MSG_FLASH) $@
-	$(OBJCOPY) -O binary -R .eeprom -R .fuse -R .lock $< $@
+	@echo $(MSG_BINARY) $@
+	@$(OBJCOPY) -O binary -R .eeprom -R .fuse -R .lock $< $@
 
 # FIXME: more deps...
 %.pfs: $(BUILDDIR)/fsroot $(BUILDDIR)/fsroot/www/version.shtml $(TARGET).bin
-	@echo
-	@echo Creating firmware image: $@
-	$(MKPOLYFS) -v -E -n $(BOARD) -q -l \
+	@echo $(MSG_PFS) $@
+	@$(MKPOLYFS) -E -n $(BOARD) -q -l \
 		-i $(TARGET).bin \
 		$(BUILDDIR)/fsroot $@
-	$(POLYFSCK) -v $@
+	@$(POLYFSCK) $@
 
 $(BUILDDIR)/fsroot: $(IMAGE_DIR)/fsroot $(TARGET).bin
-	$(REMOVEDIR) "$(BUILDDIR)/fsroot"
-	rsync -a \
+	@$(REMOVEDIR) "$(BUILDDIR)/fsroot"
+	@rsync -a \
 		--exclude ".*.swp" \
 		--exclude .DS_Store --exclude "._*" \
 		"$(IMAGE_DIR)/fsroot/" "$(BUILDDIR)/fsroot/"
-	touch "$(BUILDDIR)/fsroot"
+	@touch "$(BUILDDIR)/fsroot"
 
 $(BUILDDIR)/fsroot/www/version.shtml: $(TARGET).bin $(BUILDDIR)/config.h
 	@echo "%!:/head.html" > $@
@@ -42,7 +43,7 @@ $(BUILDDIR)/fsroot/www/version.shtml: $(TARGET).bin $(BUILDDIR)/config.h
 
 FSFILES := $(shell find $(IMAGE_DIR)/fsroot -mindepth 1 -print)
 $(IMAGE_DIR)/fsroot: $(FSFILES)
-	touch $(IMAGE_DIR)/fsroot
+	@touch $(IMAGE_DIR)/fsroot
 
 EXTRA_BUILD_RULES += pfs
 EXTRA_CLEAN_FILES += $(TARGET).bin $(TARGET).pfs
