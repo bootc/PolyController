@@ -404,10 +404,10 @@ MSG_FLASH = Creating load file for Flash:
 MSG_EEPROM = Creating load file for EEPROM:
 MSG_EXTENDED_LISTING = Creating Extended Listing:
 MSG_SYMBOL_TABLE = Creating Symbol Table:
-MSG_LINKING = Linking:
-MSG_COMPILING = Compiling C:
-MSG_COMPILING_CPP = Compiling C++:
-MSG_ASSEMBLING = Assembling:
+MSG_LINKING = " [LD]   "
+MSG_COMPILING = " [C]    "
+MSG_COMPILING_CPP = " [CPP]  "
+MSG_ASSEMBLING = " [AS]   "
 MSG_CLEANING = Cleaning project:
 MSG_CREATING_LIBRARY = Creating library:
 
@@ -602,34 +602,30 @@ extcoff: $(TARGET).elf
 .SECONDARY : $(TARGET).a
 .PRECIOUS : $(OBJ)
 %.a: $(OBJ)
-	@echo
 	@echo $(MSG_CREATING_LIBRARY) $@
-	$(AR) $@ $(OBJ)
+	@$(AR) $@ $(OBJ)
 
 
 # Link: create ELF output file from object files.
 .SECONDARY : $(TARGET).elf
 .PRECIOUS : $(OBJ)
 %.elf: $(OBJ)
-	@echo
 	@echo $(MSG_LINKING) $@
-	$(CC) $(ALL_CFLAGS) $^ --output $@ $(LDFLAGS)
+	@$(CC) $(ALL_CFLAGS) $^ --output $@ $(LDFLAGS)
 
 
 # Compile: create object files from C source files.
 $(OBJDIR)/%.o : %.c
-	@echo
 	@echo $(MSG_COMPILING) $<
-	mkdir -p $(shell dirname $@)
-	$(CC) -c $(ALL_CFLAGS) $< -o $@
+	@mkdir -p $(shell dirname $@)
+	@$(CC) -c $(ALL_CFLAGS) $< -o $@
 
 
 # Compile: create object files from C++ source files.
 $(OBJDIR)/%.o : %.cpp
-	@echo
 	@echo $(MSG_COMPILING_CPP) $<
-	mkdir -p $(shell dirname $@)
-	$(CC) -c $(ALL_CPPFLAGS) $< -o $@
+	@mkdir -p $(shell dirname $@)
+	@$(CC) -c $(ALL_CPPFLAGS) $< -o $@
 
 
 # Compile: create assembler files from C source files.
@@ -644,10 +640,9 @@ $(OBJDIR)/%.o : %.cpp
 
 # Assemble: create object files from assembler source files.
 $(OBJDIR)/%.o : %.S
-	@echo
 	@echo $(MSG_ASSEMBLING) $<
-	mkdir -p $(shell dirname $@)
-	$(CC) -c $(ALL_ASFLAGS) $< -o $@
+	@mkdir -p $(shell dirname $@)
+	@$(CC) -c $(ALL_ASFLAGS) $< -o $@
 
 
 # Create preprocessed source for use in sending a bug report.
