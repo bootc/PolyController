@@ -75,7 +75,7 @@ static const char running[] PROGMEM = /*  "RUNNING"*/
 static const char called[] PROGMEM = /*  "CALLED"*/
 {0x43, 0x41, 0x4c, 0x4c, 0x45, 0x44, 0};
 
-static const char *states[] PROGMEM = {
+static const char * const states[] PROGMEM = {
 	closed,
 	syn_rcvd,
 	syn_sent,

@@ -264,7 +264,7 @@ static void newdata(void) {
 	unsigned char *nameptr;
 	struct dns_answer *ans;
 	struct dns_hdr *hdr;
-	static uint8_t nquestions, nanswers;
+	static uint8_t nanswers;
 	static uint8_t i;
 	register struct namemap *namemapptr;
 
@@ -306,7 +306,6 @@ static void newdata(void) {
 
 	/* We only care about the question(s) and the answers. The authrr
 	   and the extrarr are simply discarded. */
-	nquestions = (uint8_t)uip_htons(hdr->numquestions);
 	nanswers = (uint8_t)uip_htons(hdr->numanswers);
 
 	/* Skip the name in the question. XXX: This should really be

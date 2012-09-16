@@ -878,12 +878,8 @@ static int is_zero(char const *begin, unsigned len)
 static unsigned int do_compress(char *base, unsigned int offset, struct entry *entry)
 {
 	unsigned int size = entry->size;
-	unsigned long original_size = size;
-	unsigned long original_offset = offset;
-	unsigned long new_size;
 	unsigned long blocks = (size - 1) / blksize + 1;
 	unsigned long curr = offset + 4 * blocks;
-	int change;
 	char *uncompressed = entry->uncompressed;
 
 	total_blocks += blocks; 
@@ -926,17 +922,6 @@ static unsigned int do_compress(char *base, unsigned int offset, struct entry *e
 	} while (size);
 
 	curr = (curr + 3) & ~3;
-	new_size = curr - original_offset;
-	/* TODO: Arguably, original_size in these 2 lines should be
-	   st_blocks * 512.  But if you say that then perhaps
-	   administrative data should also be included in both. */
-	change = new_size - original_size;
-#if 0
-	if (opt_verbose) {
-		printf("%6.2f%% (%+d bytes)\t%s\n",
-				(change * 100) / (double) original_size, change, entry->name);
-	}
-#endif
 
 	return curr;
 }

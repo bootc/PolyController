@@ -106,7 +106,7 @@ static int cmd_bit(struct owfsd_state *s);
 static int cmd_search(struct owfsd_state *s);
 static int cmd_byte_spu(struct owfsd_state *s);
 
-static struct owfs_command commands[] PROGMEM = {
+static const struct owfs_command commands[] PROGMEM = {
 	{ CMD_RESET,	cmd_reset,		{ .bus_op = 1, .lock_auto = 1, } },
 	{ CMD_BYTES,	cmd_byte,		{ .bus_op = 1, } },
 	{ CMD_BITS,		cmd_bit,		{ .bus_op = 1, } },
@@ -345,7 +345,7 @@ static PT_THREAD(handle_connection(struct owfsd_state *s)) {
 		}
 
 		// Get the command info
-		struct owfs_command *cmd = commands;
+		const struct owfs_command *cmd = commands;
 		do {
 			uint8_t c = pgm_read_byte(&cmd->cmd);
 			if (!c) {

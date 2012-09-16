@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include "shell.h"
 
-static char progress[] PROGMEM = {
+static const char progress[] PROGMEM = {
 	'-', '\\', '|', '/'
 };
 

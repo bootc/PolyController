@@ -61,7 +61,6 @@ typedef uint16_t uip_stats_t;
 typedef uint16_t clock_time_t;
 
 void clock_delay(unsigned int us2);
-void clock_wait(int ms10);
 void clock_set_seconds(uint32_t s);
 uint32_t clock_seconds(void);
 
